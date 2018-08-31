@@ -253,10 +253,11 @@ fn find_outdated(registry: &mut PackageRegistry, config: &Config, ids: &[Package
 
 fn find_latest_version(registry: &mut PackageRegistry, crates_io: &SourceId, name: &str) -> CargoResult<Version> {
     let versions = registry.query_vec(&Dependency::parse_no_deprecated(name, None, &crates_io)?)?;
+    let empty = Version::from_str("0.0.0").unwrap();
     let latest_version = versions.iter()
                            .filter(|x| !x.version().is_prerelease())
                            .map(|x| x.version())
-                           .max().expect("there must be at least one version available");
+                           .max().unwrap_or(&empty);
 
     Ok(latest_version.to_owned())
 }
