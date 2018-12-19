@@ -7,6 +7,7 @@ extern crate semver;
 extern crate colored;
 extern crate postgres;
 extern crate serde_json;
+extern crate dirs;
 
 #[macro_use]
 extern crate structopt;
@@ -194,7 +195,7 @@ fn real_main(args: Args, config: &mut Config) -> CliResult {
     let outdated = find_outdated(&mut registry, &config, &ids)?;
     // println!("outdated: {:?}", outdated);
 
-    let packages = registry.get(&ids);
+    let packages = registry.get(&ids)?;
 
     let root = match args.package {
         Some(ref pkg) => resolve.query(pkg)?,
@@ -252,7 +253,7 @@ fn find_outdated(registry: &mut PackageRegistry, config: &Config, ids: &[Package
 }
 
 fn find_latest_version(registry: &mut PackageRegistry, crates_io: &SourceId, name: &str) -> CargoResult<Version> {
-    let versions = registry.query_vec(&Dependency::parse_no_deprecated(name, None, &crates_io)?)?;
+    let versions = registry.query_vec(&Dependency::parse_no_deprecated(name, None, &crates_io)?, false)?;
     let empty = Version::from_str("0.0.0").unwrap();
     let latest_version = versions.iter()
                            .filter(|x| !x.version().is_prerelease())
@@ -369,7 +370,7 @@ fn build_graph<'a>(
 
     while let Some(pkg_id) = pending.pop() {
         let idx = graph.nodes[&pkg_id];
-        let pkg = packages.get(pkg_id)?;
+        let pkg = packages.get_one(pkg_id)?;
 
         for raw_dep_id in resolve.deps_not_replaced(pkg_id) {
             let it = pkg

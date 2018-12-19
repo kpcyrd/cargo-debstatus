@@ -46,8 +46,8 @@ impl Connection {
         // TODO: udd-mirror doesn't support tls
         let sock = postgres::Connection::connect(POSTGRES, TlsMode::None)?;
 
-        let cache_dir = env::home_dir().expect("home directory not found")
-                                       .join(".cache/cargo-debstatus");
+        let cache_dir = dirs::cache_dir().expect("cache directory not found")
+                                         .join("cargo-debstatus");
 
         fs::create_dir_all(&cache_dir)?;
 
