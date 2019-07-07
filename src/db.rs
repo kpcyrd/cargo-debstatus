@@ -1,7 +1,7 @@
 use cargo::Config;
 use cargo::util::{self, important_paths, CargoResult, Cfg, Rustc};
 use postgres::{self, TlsMode};
-use semver::Version;
+use semver::{Version, VersionReq};
 use serde_json;
 use std::env;
 use std::fs;
@@ -18,20 +18,15 @@ pub struct CacheEntry {
     pub found: bool,
 }
 
-// TODO: also use this for outdated check(?)
-fn is_compatible(a: &str, b: &str) -> CargoResult<bool> {
+fn is_compatible(a: &str, r: &str) -> CargoResult<bool> {
     let a = Version::parse(a)?;
-    let b = Version::parse(b)?;
+    let r = VersionReq::parse(r)?;
 
-    if a.major > 0 || b.major > 0 {
-        return Ok(a.major == b.major);
+    if r.matches(&a) {
+        Ok(true)
+    } else {
+        Ok(false)
     }
-
-    if a.minor > 0 || b.minor > 0 {
-        return Ok(a.minor == b.minor);
-    }
-
-    Ok(a.patch == b.patch)
 }
 
 pub struct Connection {
