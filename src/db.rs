@@ -15,7 +15,15 @@ const CACHE_EXPIRE: Duration = Duration::from_secs(90 * 60);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CacheEntry {
     pub from: SystemTime,
-    pub found: bool,
+    pub found: Option<Version>,
+    pub matches: bool,
+}
+
+#[derive(Debug)]
+pub enum DebianRecord {
+    Sid(Version),
+    New(Version),
+    NonMatching(Version),
 }
 
 fn is_compatible(a: &Version, r: &str) -> CargoResult<bool> {
@@ -55,7 +63,7 @@ impl Connection {
         self.cache_dir.join(format!("{}-{}-{}", target, package, version))
     }
 
-    fn check_cache(&self, target: &str, package: &str, version: &str) -> CargoResult<Option<bool>> {
+    fn check_cache(&self, target: &str, package: &str, version: &str) -> CargoResult<Option<(bool, Option<Version>)>> {
         let path = self.cache_path(target, package, version);
 
         if !path.exists() {
@@ -68,47 +76,77 @@ impl Connection {
         if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
             Ok(None)
         } else {
-            Ok(Some(cache.found))
+            Ok(Some((cache.matches, cache.found)))
         }
     }
 
-    fn write_cache(&self, target: &str, package: &str, version: &str, found: bool) -> CargoResult<()> {
+    fn write_cache(&self, target: &str, package: &str, version: &str, found: &Option<(bool, Version)>) -> CargoResult<()> {
+        let matches = if let Some(found) = found {
+            found.0
+        } else {
+            false
+        };
         let cache = CacheEntry {
             from: SystemTime::now(),
-            found,
+            found: found.clone().map(|x|x.1),
+            matches,
         };
         let buf = serde_json::to_vec(&cache)?;
         fs::write(self.cache_path(target, package, version), &buf)?;
         Ok(())
     }
 
-    pub fn search(&self, config: &Config, package: &str, version: &str) -> CargoResult<bool> {
+    pub fn search(&self, config: &Config, package: &str, version: &str) -> CargoResult<Option<DebianRecord>> {
         if let Some(found) = self.check_cache("sid", package, version)? {
-            return Ok(found);
+            if found.0 {
+                return Ok(found.1.map(DebianRecord::Sid));
+            } else {
+                return Ok(found.1.map(DebianRecord::NonMatching));
+            }
         }
 
         config.shell().status("Querying", format!("sid: {}", package))?;
         let found = self.search_generic("SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
                             package, version)?;
 
-        self.write_cache("sid", package, version, found)?;
-        Ok(found)
+        self.write_cache("sid", package, version, &found)?;
+        if let Some(found) = found {
+            if found.0 {
+                Ok(Some(DebianRecord::Sid(found.1)))
+            } else {
+                Ok(Some(DebianRecord::NonMatching(found.1)))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
-    pub fn search_new(&self, config: &Config, package: &str, version: &str) -> CargoResult<bool> {
+    pub fn search_new(&self, config: &Config, package: &str, version: &str) -> CargoResult<Option<DebianRecord>> {
         if let Some(found) = self.check_cache("new", package, version)? {
-            return Ok(found);
+            if found.0 {
+                return Ok(found.1.map(DebianRecord::New));
+            } else {
+                return Ok(found.1.map(DebianRecord::NonMatching));
+            }
         }
 
         config.shell().status("Querying", format!("new: {}", package))?;
         let found = self.search_generic("SELECT version::text FROM new_sources WHERE source=$1;",
                             package, version)?;
 
-        self.write_cache("new", package, version, found)?;
-        Ok(found)
+        self.write_cache("new", package, version, &found)?;
+        if let Some(found) = found {
+            if found.0 {
+                Ok(Some(DebianRecord::New(found.1)))
+            } else {
+                Ok(Some(DebianRecord::NonMatching(found.1)))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
-    pub fn search_generic(&self, query: &str, package: &str, version: &str) -> CargoResult<bool> {
+    pub fn search_generic(&self, query: &str, package: &str, version: &str) -> CargoResult<Option<(bool, Version)>> {
         let package = package.replace("_", "-");
         let rows = self.sock.query(query,
                                    &[&format!("rust-{}", package)])?;
@@ -130,10 +168,14 @@ impl Connection {
             // println!("{} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
 
             if is_compatible(debversion, version)? {
-                return Ok(true);
+                return Ok(Some((true, debversion.clone())));
             }
         }
 
-        Ok(false)
+        if versions.len() > 0 {
+            return Ok(Some((false, versions[0].clone())));
+        }
+
+        Ok(None)
     }
 }

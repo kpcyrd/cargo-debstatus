@@ -41,6 +41,7 @@ use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 use db::Connection;
+use db::DebianRecord;
 mod db;
 
 #[derive(StructOpt)]
@@ -231,24 +232,23 @@ fn real_main(args: Args, config: &mut Config) -> CliResult {
 }
 
 
-fn find_in_debian(config: &Config, sock: &Connection, ids: &[PackageId]) -> CargoResult<(HashSet<String>, HashSet<String>)> {
-    let mut sid = HashSet::new();
-    let mut new = HashSet::new();
+fn find_in_debian(config: &Config, sock: &Connection, ids: &[PackageId]) -> CargoResult<HashMap<String, DebianRecord>> {
+    let mut map = HashMap::new();
 
     for id in ids {
         if id.source_id().is_registry() {
             let name = id.name();
             let version = id.version().to_string();
 
-            if sock.search(&config, &name, &version)? {
-                sid.insert(id.to_string());
-            } else if sock.search_new(&config, &name, &version)? {
-                new.insert(id.to_string());
+            if let Some(found) = sock.search(&config, &name, &version)? {
+                map.insert(id.to_string(), found);
+            } else if let Some(found) = sock.search_new(&config, &name, &version)? {
+                map.insert(id.to_string(), found);
             }
         }
     }
 
-    Ok((sid, new))
+    Ok(map)
 }
 
 fn get_cfgs(rustc: &Rustc, target: &Option<String>) -> CargoResult<Option<Vec<Cfg>>> {
@@ -376,7 +376,7 @@ fn build_graph<'a>(
 fn print_tree<'a>(
     package: &'a PackageId,
     graph: &Graph<'a>,
-    debian: &(HashSet<String>, HashSet<String>),
+    debian: &HashMap<String, DebianRecord>,
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
@@ -400,7 +400,7 @@ fn print_tree<'a>(
 fn print_dependency<'a>(
     package: &Node<'a>,
     graph: &Graph<'a>,
-    debian: &(HashSet<String>, HashSet<String>),
+    debian: &HashMap<String, DebianRecord>,
     direction: EdgeDirection,
     symbols: &Symbols,
     levels_continue: &mut Vec<bool>,
@@ -429,14 +429,20 @@ fn print_dependency<'a>(
 
     let fmt = package.id.to_string();
 
-    if debian.0.contains(&fmt) {
-        println!("{} (in debian)", fmt.green());
-        // TODO: option to display the whole tree
-        return;
-    } else if debian.1.contains(&fmt) {
-        println!("{} (in debian NEW queue)", fmt.blue());
-        // TODO: option to display the whole tree
-        return;
+    if let Some(found) = debian.get(&fmt) {
+        match found {
+            DebianRecord::Sid(v) => {
+                println!("{} ({} in debian)", fmt.green(), v);
+                // TODO: option to display the whole tree
+                return;
+            }
+            DebianRecord::New(v) => {
+                println!("{} ({} in debian NEW queue)", fmt.blue(), v);
+                // TODO: option to display the whole tree
+                return;
+            }
+            DebianRecord::NonMatching(v) => println!("{} ({} invalid in debian)", fmt.yellow(), v),
+        }
     } else {
         println!("{}", fmt);
     }
@@ -472,7 +478,7 @@ fn print_dependency<'a>(
 fn print_dependency_kind<'a>(
     mut deps: Vec<&Node<'a>>,
     graph: &Graph<'a>,
-    debian: &(HashSet<String>, HashSet<String>),
+    debian: &HashMap<String, DebianRecord>,
     direction: EdgeDirection,
     symbols: &Symbols,
     levels_continue: &mut Vec<bool>,
