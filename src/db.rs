@@ -18,8 +18,7 @@ pub struct CacheEntry {
     pub found: bool,
 }
 
-fn is_compatible(a: &str, r: &str) -> CargoResult<bool> {
-    let a = Version::parse(a)?;
+fn is_compatible(a: &Version, r: &str) -> CargoResult<bool> {
     let r = VersionReq::parse(r)?;
 
     if r.matches(&a) {
@@ -114,6 +113,7 @@ impl Connection {
         let rows = self.sock.query(query,
                                    &[&format!("rust-{}", package)])?;
 
+        let mut versions = Vec::new();
         for row in &rows {
             let debversion: String = row.get(0);
 
@@ -121,8 +121,13 @@ impl Connection {
                 Some(idx) => debversion.split_at(idx).0,
                 _ => &debversion,
             };
+            versions.push(Version::parse(debversion).unwrap());
+        }
+        versions.sort_unstable();
+        versions.reverse();
 
-            // println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
+        for debversion in &versions {
+            // println!("{} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
 
             if is_compatible(debversion, version)? {
                 return Ok(true);
