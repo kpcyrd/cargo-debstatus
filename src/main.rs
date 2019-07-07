@@ -192,9 +192,6 @@ fn real_main(args: Args, config: &mut Config) -> CliResult {
     let debian = find_in_debian(&config, &db, &ids)?;
     // println!("debian: {:?}", debian);
 
-    let outdated = find_outdated(&mut registry, &config, &ids)?;
-    // println!("outdated: {:?}", outdated);
-
     let packages = registry.get(&ids)?;
 
     let root = match args.package {
@@ -228,40 +225,11 @@ fn real_main(args: Args, config: &mut Config) -> CliResult {
         Prefix::Indent
     };
 
-    print_tree(root, &graph, &outdated, &debian, direction, symbols, prefix, args.all);
+    print_tree(root, &graph, &debian, direction, symbols, prefix, args.all);
 
     Ok(())
 }
 
-fn find_outdated(registry: &mut PackageRegistry, config: &Config, ids: &[PackageId]) -> CargoResult<HashSet<String>> {
-    let crates_io = SourceId::crates_io(config)?;
-
-    let mut outdated = HashSet::new();
-
-    for id in ids {
-        if id.source_id().is_registry() {
-            let latest_version = find_latest_version(registry, &crates_io, &id.name())?;
-
-            if *id.version() != latest_version {
-                // println!("outdated: {:?} {} -> {}", id.name(), id.version(), latest_version);
-                outdated.insert(id.to_string());
-            }
-        }
-    }
-
-    Ok(outdated)
-}
-
-fn find_latest_version(registry: &mut PackageRegistry, crates_io: &SourceId, name: &str) -> CargoResult<Version> {
-    let versions = registry.query_vec(&Dependency::parse_no_deprecated(name, None, &crates_io)?, false)?;
-    let empty = Version::from_str("0.0.0").unwrap();
-    let latest_version = versions.iter()
-                           .filter(|x| !x.version().is_prerelease())
-                           .map(|x| x.version())
-                           .max().unwrap_or(&empty);
-
-    Ok(latest_version.to_owned())
-}
 
 fn find_in_debian(config: &Config, sock: &Connection, ids: &[PackageId]) -> CargoResult<(HashSet<String>, HashSet<String>)> {
     let mut sid = HashSet::new();
@@ -408,7 +376,6 @@ fn build_graph<'a>(
 fn print_tree<'a>(
     package: &'a PackageId,
     graph: &Graph<'a>,
-    outdated: &HashSet<String>,
     debian: &(HashSet<String>, HashSet<String>),
     direction: EdgeDirection,
     symbols: &Symbols,
@@ -421,7 +388,6 @@ fn print_tree<'a>(
     print_dependency(
         node,
         &graph,
-        outdated,
         debian,
         direction,
         symbols,
@@ -434,7 +400,6 @@ fn print_tree<'a>(
 fn print_dependency<'a>(
     package: &Node<'a>,
     graph: &Graph<'a>,
-    outdated: &HashSet<String>,
     debian: &(HashSet<String>, HashSet<String>),
     direction: EdgeDirection,
     symbols: &Symbols,
@@ -472,8 +437,6 @@ fn print_dependency<'a>(
         println!("{} (in debian NEW queue)", fmt.blue());
         // TODO: option to display the whole tree
         return;
-    } else if outdated.contains(&fmt) {
-        println!("{} (outdated)", fmt.yellow());
     } else {
         println!("{}", fmt);
     }
@@ -497,7 +460,6 @@ fn print_dependency<'a>(
     print_dependency_kind(
         normal,
         graph,
-        outdated,
         debian,
         direction,
         symbols,
@@ -510,7 +472,6 @@ fn print_dependency<'a>(
 fn print_dependency_kind<'a>(
     mut deps: Vec<&Node<'a>>,
     graph: &Graph<'a>,
-    outdated: &HashSet<String>,
     debian: &(HashSet<String>, HashSet<String>),
     direction: EdgeDirection,
     symbols: &Symbols,
@@ -531,7 +492,6 @@ fn print_dependency_kind<'a>(
         print_dependency(
             dependency,
             graph,
-            outdated,
             debian,
             direction,
             symbols,
