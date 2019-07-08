@@ -70,6 +70,9 @@ struct Args {
     /// Directory for all generated artifacts
     #[structopt(long = "target-dir", value_name = "DIRECTORY", parse(from_os_str))]
     target_dir: Option<PathBuf>,
+    #[structopt(long = "all-targets")]
+    /// Return dependencies for all targets. By default only the host target is matched.
+    all_targets: bool,
     #[structopt(long = "manifest-path", value_name = "PATH", parse(from_os_str))]
     /// Path to Cargo.toml
     manifest_path: Option<PathBuf>,
@@ -202,12 +205,18 @@ fn real_main(args: Args, config: &mut Config) -> CliResult {
 
     let rustc = config.rustc(Some(&workspace))?;
 
+    let target = if args.all_targets {
+        None
+    } else {
+        Some(args.target.as_ref().unwrap_or(&rustc.host).as_str())
+    };
+
     let cfgs = get_cfgs(&rustc, &args.target)?;
     let graph = build_graph(
         &resolve,
         &packages,
         package.package_id(),
-        None,
+        target,
         cfgs.as_ref().map(|r| &**r),
     )?;
 
