@@ -1,9 +1,8 @@
-use cargo::Config;
-use cargo::util::{self, important_paths, CargoResult, Cfg, Rustc};
+use anyhow::Error;
 use postgres::{self, TlsMode};
 use semver::Version;
+use serde::{Serialize, Deserialize};
 use serde_json;
-use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -19,7 +18,7 @@ pub struct CacheEntry {
 }
 
 // TODO: also use this for outdated check(?)
-fn is_compatible(a: &str, b: &str) -> CargoResult<bool> {
+fn is_compatible(a: &str, b: &str) -> Result<bool, Error> {
     let a = Version::parse(a)?;
     let b = Version::parse(b)?;
 
@@ -40,7 +39,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new() -> CargoResult<Connection> {
+    pub fn new() -> Result<Connection, Error> {
         // let tls = postgres::tls::native_tls::NativeTls::new()?;
         // let sock = postgres::Connection::connect(POSTGRES, TlsMode::Require(&tls))?;
         // TODO: udd-mirror doesn't support tls
@@ -61,7 +60,7 @@ impl Connection {
         self.cache_dir.join(format!("{}-{}-{}", target, package, version))
     }
 
-    fn check_cache(&self, target: &str, package: &str, version: &str) -> CargoResult<Option<bool>> {
+    fn check_cache(&self, target: &str, package: &str, version: &str) -> Result<Option<bool>, Error> {
         let path = self.cache_path(target, package, version);
 
         if !path.exists() {
@@ -78,7 +77,7 @@ impl Connection {
         }
     }
 
-    fn write_cache(&self, target: &str, package: &str, version: &str, found: bool) -> CargoResult<()> {
+    fn write_cache(&self, target: &str, package: &str, version: &str, found: bool) -> Result<(), Error> {
         let cache = CacheEntry {
             from: SystemTime::now(),
             found,
@@ -88,12 +87,13 @@ impl Connection {
         Ok(())
     }
 
-    pub fn search(&self, config: &Config, package: &str, version: &str) -> CargoResult<bool> {
+    pub fn search(&self, package: &str, version: &str) -> Result<bool, Error> {
         if let Some(found) = self.check_cache("sid", package, version)? {
             return Ok(found);
         }
 
-        config.shell().status("Querying", format!("sid: {}", package))?;
+        // config.shell().status("Querying", format!("sid: {}", package))?;
+        println!("Querying -> sid: {}", package);
         let found = self.search_generic("SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
                             package, version)?;
 
@@ -101,12 +101,13 @@ impl Connection {
         Ok(found)
     }
 
-    pub fn search_new(&self, config: &Config, package: &str, version: &str) -> CargoResult<bool> {
+    pub fn search_new(&self, package: &str, version: &str) -> Result<bool, Error> {
         if let Some(found) = self.check_cache("new", package, version)? {
             return Ok(found);
         }
 
-        config.shell().status("Querying", format!("new: {}", package))?;
+        // config.shell().status("Querying", format!("new: {}", package))?;
+        println!("Querying -> new: {}", package);
         let found = self.search_generic("SELECT version::text FROM new_sources WHERE source=$1;",
                             package, version)?;
 
@@ -114,7 +115,7 @@ impl Connection {
         Ok(found)
     }
 
-    pub fn search_generic(&self, query: &str, package: &str, version: &str) -> CargoResult<bool> {
+    pub fn search_generic(&self, query: &str, package: &str, version: &str) -> Result<bool, Error> {
         let package = package.replace("_", "-");
         let rows = self.sock.query(query,
                                    &[&format!("rust-{}", package)])?;
