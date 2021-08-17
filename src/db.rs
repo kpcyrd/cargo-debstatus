@@ -1,5 +1,5 @@
 use anyhow::Error;
-use postgres::{self, TlsMode};
+use postgres::{Client, NoTls};
 use semver::Version;
 use serde::{Serialize, Deserialize};
 use serde_json;
@@ -34,7 +34,7 @@ fn is_compatible(a: &str, b: &str) -> Result<bool, Error> {
 }
 
 pub struct Connection {
-    sock: postgres::Connection,
+    sock: Client,
     cache_dir: PathBuf,
 }
 
@@ -43,7 +43,7 @@ impl Connection {
         // let tls = postgres::tls::native_tls::NativeTls::new()?;
         // let sock = postgres::Connection::connect(POSTGRES, TlsMode::Require(&tls))?;
         // TODO: udd-mirror doesn't support tls
-        let sock = postgres::Connection::connect(POSTGRES, TlsMode::None)?;
+        let sock = Client::connect(POSTGRES, NoTls)?;
 
         let cache_dir = dirs::cache_dir().expect("cache directory not found")
                                          .join("cargo-debstatus");
@@ -87,7 +87,7 @@ impl Connection {
         Ok(())
     }
 
-    pub fn search(&self, package: &str, version: &str) -> Result<bool, Error> {
+    pub fn search(&mut self, package: &str, version: &str) -> Result<bool, Error> {
         if let Some(found) = self.check_cache("sid", package, version)? {
             return Ok(found);
         }
@@ -101,7 +101,7 @@ impl Connection {
         Ok(found)
     }
 
-    pub fn search_new(&self, package: &str, version: &str) -> Result<bool, Error> {
+    pub fn search_new(&mut self, package: &str, version: &str) -> Result<bool, Error> {
         if let Some(found) = self.check_cache("new", package, version)? {
             return Ok(found);
         }
@@ -115,7 +115,7 @@ impl Connection {
         Ok(found)
     }
 
-    pub fn search_generic(&self, query: &str, package: &str, version: &str) -> Result<bool, Error> {
+    pub fn search_generic(&mut self, query: &str, package: &str, version: &str) -> Result<bool, Error> {
         let package = package.replace("_", "-");
         let rows = self.sock.query(query,
                                    &[&format!("rust-{}", package)])?;

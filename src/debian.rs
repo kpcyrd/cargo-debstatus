@@ -24,7 +24,7 @@ impl Pkg {
             name: pkg.name,
             version: pkg.version,
             source: pkg.source,
-            manifest_path: pkg.manifest_path,
+            manifest_path: pkg.manifest_path.into(),
             license: pkg.license,
             repository: pkg.repository,
 
@@ -51,7 +51,7 @@ pub fn populate(graph: &mut Graph) -> Result<(), Error> {
     let idxs = graph.graph.node_indices()
         .collect::<Vec<_>>();
 
-    let db = Connection::new()?;
+    let mut db = Connection::new()?;
 
     for idx in idxs {
         if let Some(mut pkg) = graph.graph.node_weight_mut(idx) {
