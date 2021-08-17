@@ -1,7 +1,7 @@
-use colored::Colorize;
 use crate::debian::Pkg;
 use crate::format::parse::{Parser, RawChunk};
 use anyhow::{anyhow, Error};
+use colored::Colorize;
 use std::fmt;
 
 mod parse;

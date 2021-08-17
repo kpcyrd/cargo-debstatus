@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use crate::args::{Args, Charset};
 use crate::debian::Pkg;
 use crate::format::Pattern;
