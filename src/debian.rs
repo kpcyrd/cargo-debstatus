@@ -1,10 +1,16 @@
 use crate::db::Connection;
+use crate::errors::*;
 use crate::graph::Graph;
-use anyhow::Error;
 use cargo_metadata::{Package, PackageId, Source};
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 use semver::Version;
 use std::path::PathBuf;
+use std::thread;
 
+const QUERY_THREADS: usize = 24;
+
+#[derive(Debug, Clone)]
 pub struct Pkg {
     pub id: PackageId,
     pub name: String,
@@ -41,36 +47,92 @@ impl Pkg {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct DebianInfo {
     pub in_unstable: bool,
     pub in_new: bool,
     pub outdated: bool,
 }
 
+fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
+    let mut deb = DebianInfo {
+        in_unstable: false,
+        in_new: false,
+        outdated: false,
+    };
+
+    if db.search(&pkg.name, &pkg.version.to_string()).unwrap() {
+        deb.in_unstable = true;
+    } else if db.search_new(&pkg.name, &pkg.version.to_string()).unwrap() {
+        deb.in_new = true;
+    }
+
+    Ok(deb)
+}
+
 pub fn populate(graph: &mut Graph) -> Result<(), Error> {
-    let idxs = graph.graph.node_indices().collect::<Vec<_>>();
+    let (task_tx, task_rx) = crossbeam_channel::unbounded();
+    let (return_tx, return_rx) = crossbeam_channel::unbounded();
 
-    let mut db = Connection::new()?;
+    info!("Creating thread-pool");
+    for _ in 0..QUERY_THREADS {
+        let task_rx = task_rx.clone();
+        let return_tx = return_tx.clone();
 
-    for idx in idxs {
-        if let Some(mut pkg) = graph.graph.node_weight_mut(idx) {
-            let mut deb = DebianInfo {
-                in_unstable: false,
-                in_new: false,
-                outdated: false,
+        thread::spawn(move || {
+            let mut db = match Connection::new() {
+                Ok(db) => db,
+                Err(err) => {
+                    return_tx.send(Err(err)).unwrap();
+                    return;
+                }
             };
 
-            if db.search(&pkg.name, &pkg.version.to_string())? {
-                deb.in_unstable = true;
-            } else if db.search_new(&pkg.name, &pkg.version.to_string())? {
-                deb.in_new = true;
+            for (idx, pkg) in task_rx {
+                let deb = run_task(&mut db, pkg);
+                if return_tx.send(Ok((idx, deb))).is_err() {
+                    break;
+                }
             }
+        });
+    }
 
-            // TODO: outdated is missing
+    info!("Getting node indices");
+    let idxs = graph.graph.node_indices().collect::<Vec<_>>();
+    let jobs = idxs.len();
+    debug!("Found node indices: {}", jobs);
 
-            pkg.debinfo = Some(deb);
+    for idx in idxs {
+        if let Some(pkg) = graph.graph.node_weight_mut(idx) {
+            debug!("Adding job for {:?}: {:?}", idx, pkg);
+            let pkg = pkg.clone();
+            task_tx.send((idx, pkg)).unwrap();
         }
     }
+
+    info!("Processing debian results");
+
+    let pb = ProgressBar::new(jobs as u64)
+        .with_style(
+            ProgressStyle::default_bar()
+                .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}"),
+        )
+        .with_prefix("Resolving debian packages");
+    pb.tick();
+
+    for result in return_rx.iter().take(jobs) {
+        let result = result.context("A worker crashed")?;
+
+        let idx = result.0;
+        let deb = result.1?;
+
+        if let Some(pkg) = graph.graph.node_weight_mut(idx) {
+            pkg.debinfo = Some(deb);
+        }
+        pb.inc(1);
+    }
+
+    pb.finish_and_clear();
 
     Ok(())
 }
