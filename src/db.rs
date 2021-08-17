@@ -1,4 +1,4 @@
-use anyhow::Error;
+use crate::errors::*;
 use postgres::{Client, NoTls};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,9 @@ impl Connection {
         // let tls = postgres::tls::native_tls::NativeTls::new()?;
         // let sock = postgres::Connection::connect(POSTGRES, TlsMode::Require(&tls))?;
         // TODO: udd-mirror doesn't support tls
+        debug!("Connecting to database");
         let sock = Client::connect(POSTGRES, NoTls)?;
+        debug!("Got database connection");
 
         let cache_dir = dirs::cache_dir()
             .expect("cache directory not found")
@@ -101,7 +103,7 @@ impl Connection {
         }
 
         // config.shell().status("Querying", format!("sid: {}", package))?;
-        println!("Querying -> sid: {}", package);
+        info!("Querying -> sid: {}", package);
         let found = self.search_generic(
             "SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
             package,
@@ -118,7 +120,7 @@ impl Connection {
         }
 
         // config.shell().status("Querying", format!("new: {}", package))?;
-        println!("Querying -> new: {}", package);
+        info!("Querying -> new: {}", package);
         let found = self.search_generic(
             "SELECT version::text FROM new_sources WHERE source=$1;",
             package,
