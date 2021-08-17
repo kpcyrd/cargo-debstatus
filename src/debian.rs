@@ -1,7 +1,7 @@
-use anyhow::Error;
-use cargo_metadata::{Package, PackageId, Source};
 use crate::db::Connection;
 use crate::graph::Graph;
+use anyhow::Error;
+use cargo_metadata::{Package, PackageId, Source};
 use semver::Version;
 use std::path::PathBuf;
 
@@ -48,8 +48,7 @@ pub struct DebianInfo {
 }
 
 pub fn populate(graph: &mut Graph) -> Result<(), Error> {
-    let idxs = graph.graph.node_indices()
-        .collect::<Vec<_>>();
+    let idxs = graph.graph.node_indices().collect::<Vec<_>>();
 
     let mut db = Connection::new()?;
 

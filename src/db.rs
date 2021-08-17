@@ -1,11 +1,10 @@
 use anyhow::Error;
 use postgres::{Client, NoTls};
 use semver::Version;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
-
 
 const POSTGRES: &str = "postgresql://udd-mirror:udd-mirror@udd-mirror.debian.net/udd";
 const CACHE_EXPIRE: Duration = Duration::from_secs(90 * 60);
@@ -44,22 +43,26 @@ impl Connection {
         // TODO: udd-mirror doesn't support tls
         let sock = Client::connect(POSTGRES, NoTls)?;
 
-        let cache_dir = dirs::cache_dir().expect("cache directory not found")
-                                         .join("cargo-debstatus");
+        let cache_dir = dirs::cache_dir()
+            .expect("cache directory not found")
+            .join("cargo-debstatus");
 
         fs::create_dir_all(&cache_dir)?;
 
-        Ok(Connection {
-            sock,
-            cache_dir,
-        })
+        Ok(Connection { sock, cache_dir })
     }
 
     fn cache_path(&self, target: &str, package: &str, version: &str) -> PathBuf {
-        self.cache_dir.join(format!("{}-{}-{}", target, package, version))
+        self.cache_dir
+            .join(format!("{}-{}-{}", target, package, version))
     }
 
-    fn check_cache(&self, target: &str, package: &str, version: &str) -> Result<Option<bool>, Error> {
+    fn check_cache(
+        &self,
+        target: &str,
+        package: &str,
+        version: &str,
+    ) -> Result<Option<bool>, Error> {
         let path = self.cache_path(target, package, version);
 
         if !path.exists() {
@@ -76,7 +79,13 @@ impl Connection {
         }
     }
 
-    fn write_cache(&self, target: &str, package: &str, version: &str, found: bool) -> Result<(), Error> {
+    fn write_cache(
+        &self,
+        target: &str,
+        package: &str,
+        version: &str,
+        found: bool,
+    ) -> Result<(), Error> {
         let cache = CacheEntry {
             from: SystemTime::now(),
             found,
@@ -93,8 +102,11 @@ impl Connection {
 
         // config.shell().status("Querying", format!("sid: {}", package))?;
         println!("Querying -> sid: {}", package);
-        let found = self.search_generic("SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
-                            package, version)?;
+        let found = self.search_generic(
+            "SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
+            package,
+            version,
+        )?;
 
         self.write_cache("sid", package, version, found)?;
         Ok(found)
@@ -107,17 +119,24 @@ impl Connection {
 
         // config.shell().status("Querying", format!("new: {}", package))?;
         println!("Querying -> new: {}", package);
-        let found = self.search_generic("SELECT version::text FROM new_sources WHERE source=$1;",
-                            package, version)?;
+        let found = self.search_generic(
+            "SELECT version::text FROM new_sources WHERE source=$1;",
+            package,
+            version,
+        )?;
 
         self.write_cache("new", package, version, found)?;
         Ok(found)
     }
 
-    pub fn search_generic(&mut self, query: &str, package: &str, version: &str) -> Result<bool, Error> {
+    pub fn search_generic(
+        &mut self,
+        query: &str,
+        package: &str,
+        version: &str,
+    ) -> Result<bool, Error> {
         let package = package.replace("_", "-");
-        let rows = self.sock.query(query,
-                                   &[&format!("rust-{}", package)])?;
+        let rows = self.sock.query(query, &[&format!("rust-{}", package)])?;
 
         for row in &rows {
             let debversion: String = row.get(0);
