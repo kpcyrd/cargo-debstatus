@@ -2,7 +2,6 @@ use anyhow::Error;
 use postgres::{Client, NoTls};
 use semver::Version;
 use serde::{Serialize, Deserialize};
-use serde_json;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
