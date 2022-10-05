@@ -1,4 +1,4 @@
-use crate::db::Connection;
+use crate::db::{Connection, CrateStatus};
 use crate::errors::*;
 use crate::graph::Graph;
 use cargo_metadata::{Package, PackageId, Source};
@@ -20,7 +20,7 @@ pub struct Pkg {
     pub license: Option<String>,
     pub repository: Option<String>,
 
-    pub debinfo: Option<DebianInfo>,
+    pub debinfo: Option<CrateStatus>,
 }
 
 impl Pkg {
@@ -40,34 +40,21 @@ impl Pkg {
 
     pub fn in_debian(&self) -> bool {
         if let Some(deb) = &self.debinfo {
-            deb.in_unstable || deb.in_new
+            deb.in_debian()
         } else {
             false
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DebianInfo {
-    pub in_unstable: bool,
-    pub in_new: bool,
-    pub outdated: bool,
-}
+fn run_task(db: &mut Connection, pkg: Pkg) -> Result<CrateStatus> {
+    let mut result = db.search(&pkg.name, &pkg.version.to_string()).unwrap();
 
-fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
-    let mut deb = DebianInfo {
-        in_unstable: false,
-        in_new: false,
-        outdated: false,
-    };
-
-    if db.search(&pkg.name, &pkg.version.to_string()).unwrap() {
-        deb.in_unstable = true;
-    } else if db.search_new(&pkg.name, &pkg.version.to_string()).unwrap() {
-        deb.in_new = true;
+    if result == CrateStatus::Missing {
+        result = db.search_new(&pkg.name, &pkg.version.to_string()).unwrap();
     }
 
-    Ok(deb)
+    Ok(result)
 }
 
 pub fn populate(graph: &mut Graph) -> Result<(), Error> {
