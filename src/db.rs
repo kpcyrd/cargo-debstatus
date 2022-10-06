@@ -17,7 +17,7 @@ pub struct CacheEntry {
 }
 
 /// The current status of a crate in Debian.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CrateStatus {
     Available,
     AvailableInNew,
@@ -120,7 +120,7 @@ impl Connection {
     ) -> Result<(), Error> {
         let cache = CacheEntry {
             from: SystemTime::now(),
-            crate_status: crate_status,
+            crate_status,
         };
         let buf = serde_json::to_vec(&cache)?;
         fs::write(self.cache_path(target, package, version), &buf)?;
@@ -189,7 +189,7 @@ impl Connection {
             }
         }
 
-        if rows.len() > 0 {
+        if !rows.is_empty() {
             return Ok(CrateStatus::Outdated);
         }
 
