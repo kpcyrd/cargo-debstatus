@@ -137,7 +137,7 @@ impl Connection {
         package: &str,
         version: &str,
     ) -> Result<bool, Error> {
-        let package = package.replace("_", "-");
+        let package = package.replace('_', "-");
         let rows = self.sock.query(query, &[&format!("rust-{}", package)])?;
 
         for row in &rows {
