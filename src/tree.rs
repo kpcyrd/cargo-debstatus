@@ -210,6 +210,7 @@ fn print_package<'a>(
     if only_missing && package.in_debian() {
         return;
     }
+
     match prefix {
         Prefix::Depth => print!("{}", levels_continue.len()),
         Prefix::Indent => {
@@ -229,7 +230,6 @@ fn print_package<'a>(
         }
         Prefix::None => {}
     }
-
 
     println!("{}", format.display(package));
 
