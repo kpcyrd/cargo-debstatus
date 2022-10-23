@@ -22,7 +22,7 @@ colored = "2"
 #postgres = { version="0.15.2", features=["with-native-tls"] }
 postgres = "0.19"
 serde = { version="1.0", features=["derive"] }
-dirs = "3"
+dirs = "4"
 log = "0.4.14"
 crossbeam-channel = "0.5.1"
 env_logger = "0.9.0"
