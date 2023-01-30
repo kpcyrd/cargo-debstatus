@@ -12,7 +12,7 @@ The codebase is a modified version of [sfackler/cargo-tree].
 
 ```shell
 $ cargo install cargo-debstatus
-$ cargo-debstatus debstatus
+$ cargo debstatus
 ```
 
 ![screenshot](screenshot.png)
