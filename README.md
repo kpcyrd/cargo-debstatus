@@ -8,6 +8,13 @@ The codebase is a modified version of [sfackler/cargo-tree].
 
 [sfackler/cargo-tree]: https://github.com/sfackler/cargo-tree
 
+## How to run
+
+```shell
+$ cargo install cargo-debstatus
+$ cargo debstatus
+```
+
 ![screenshot](screenshot.png)
 
 ## Known Bugs
