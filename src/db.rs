@@ -55,8 +55,7 @@ impl Connection {
     }
 
     fn cache_path(&self, target: &str, package: &str, version: &str) -> PathBuf {
-        self.cache_dir
-            .join(format!("{}-{}-{}", target, package, version))
+        self.cache_dir.join(format!("{target}-{package}-{version}"))
     }
 
     fn check_cache(
@@ -93,7 +92,7 @@ impl Connection {
             found,
         };
         let buf = serde_json::to_vec(&cache)?;
-        fs::write(self.cache_path(target, package, version), &buf)?;
+        fs::write(self.cache_path(target, package, version), buf)?;
         Ok(())
     }
 
@@ -138,7 +137,7 @@ impl Connection {
         version: &str,
     ) -> Result<bool, Error> {
         let package = package.replace('_', "-");
-        let rows = self.sock.query(query, &[&format!("rust-{}", package)])?;
+        let rows = self.sock.query(query, &[&format!("rust-{package}")])?;
 
         for row in &rows {
             let debversion: String = row.get(0);
