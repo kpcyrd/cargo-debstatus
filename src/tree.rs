@@ -192,7 +192,7 @@ fn print_package<'a>(
             if let Some((last_continues, rest)) = levels_continue.split_last() {
                 for continues in rest {
                     let c = if *continues { symbols.down } else { " " };
-                    print!("{}   ", c);
+                    print!("{c}   ");
                 }
 
                 let c = if *last_continues {
@@ -276,10 +276,10 @@ fn print_dependencies<'a>(
         if let Some(name) = name {
             for continues in &**levels_continue {
                 let c = if *continues { symbols.down } else { " " };
-                print!("{}   ", c);
+                print!("{c}   ");
             }
 
-            println!("{}", name);
+            println!("{name}");
         }
     }
 

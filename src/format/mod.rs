@@ -64,14 +64,14 @@ impl<'a> fmt::Display for Display<'a> {
                         } else if deb.outdated {
                             write!(fmt, "{} (outdated)", pkg.yellow())?;
                         } else {
-                            write!(fmt, "{}", pkg)?;
+                            write!(fmt, "{pkg}")?;
                         }
                     } else {
-                        write!(fmt, "{}", pkg)?;
+                        write!(fmt, "{pkg}")?;
                     }
 
                     match &self.package.source {
-                        Some(source) if !source.is_crates_io() => write!(fmt, " ({})", source)?,
+                        Some(source) if !source.is_crates_io() => write!(fmt, " ({source})")?,
                         // https://github.com/rust-lang/cargo/issues/7483
                         None => write!(
                             fmt,
@@ -83,12 +83,12 @@ impl<'a> fmt::Display for Display<'a> {
                 }
                 Chunk::License => {
                     if let Some(ref license) = self.package.license {
-                        write!(fmt, "{}", license)?
+                        write!(fmt, "{license}")?
                     }
                 }
                 Chunk::Repository => {
                     if let Some(ref repository) = self.package.repository {
-                        write!(fmt, "{}", repository)?
+                        write!(fmt, "{repository}")?
                     }
                 }
             }

@@ -87,11 +87,11 @@ fn output(command: &mut Command, job: &str) -> Result<String, Error> {
     let output = command
         .stderr(Stdio::inherit())
         .output()
-        .with_context(|| format!("error running {}", job))?;
+        .with_context(|| format!("error running {job}"))?;
 
     if !output.status.success() {
         return Err(anyhow!("{} returned {}", job, output.status));
     }
 
-    String::from_utf8(output.stdout).with_context(|| format!("error parsing {} output", job))
+    String::from_utf8(output.stdout).with_context(|| format!("error parsing {job} output"))
 }
