@@ -115,7 +115,7 @@ pub fn populate(graph: &mut Graph) -> Result<(), Error> {
     let pb = ProgressBar::new(jobs as u64)
         .with_style(
             ProgressStyle::default_bar()
-                .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}"),
+                .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}")?,
         )
         .with_prefix("Resolving debian packages");
     pb.tick();
