@@ -17,8 +17,11 @@ pub struct CacheEntry {
 
 // TODO: also use this for outdated check(?)
 fn is_compatible(a: &str, b: &str) -> Result<bool, Error> {
-    let a = Version::parse(a)?;
-    let b = Version::parse(b)?;
+    let a = a.replace('~', "-");
+    let b = b.replace('~', "-");
+
+    let a = Version::parse(&a)?;
+    let b = Version::parse(&b)?;
 
     if a.major > 0 || b.major > 0 {
         return Ok(a.major == b.major);
@@ -155,5 +158,15 @@ impl Connection {
         }
 
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::db::is_compatible;
+
+    #[test]
+    fn is_compatible_with_tilde() {
+        assert!(is_compatible("1.0.0~alpha.9", "1.0.0-alpha.9").unwrap());
     }
 }
