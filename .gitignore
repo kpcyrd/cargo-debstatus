@@ -1,2 +1,4 @@
 /target
 **/*.rs.bk
+*.kdev4
+.kdev4/
