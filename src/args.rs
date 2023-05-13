@@ -57,6 +57,9 @@ pub struct Args {
     #[structopt(long = "duplicate", short = "d")]
     /// Show only dependencies which come in multiple versions (implies -i)
     pub duplicates: bool,
+    #[structopt(long = "missing", short = "m")]
+    /// Show only dependencies which are missing or are outdated
+    pub only_missing: bool,
     #[structopt(long = "charset", value_name = "CHARSET", default_value = "utf8")]
     /// Character set to use in output: utf8, ascii
     pub charset: Charset,

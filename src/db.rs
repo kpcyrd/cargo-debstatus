@@ -2,6 +2,7 @@ use crate::errors::*;
 use postgres::{Client, NoTls};
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -12,7 +13,34 @@ const CACHE_EXPIRE: Duration = Duration::from_secs(90 * 60);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CacheEntry {
     pub from: SystemTime,
-    pub found: bool,
+    pub crate_status: CrateStatus,
+}
+
+/// The current status of a crate in Debian.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CrateStatus {
+    Available,
+    AvailableInNew,
+    Outdated,
+    Missing,
+}
+
+impl CrateStatus {
+    pub(crate) fn in_debian(&self) -> bool {
+        *self != CrateStatus::Missing
+    }
+}
+
+impl fmt::Display for CrateStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            CrateStatus::Available => "in debian",
+            CrateStatus::AvailableInNew => "in debian NEW queue",
+            CrateStatus::Outdated => "outdated",
+            CrateStatus::Missing => "missing",
+        };
+        write!(f, "{}", str)
+    }
 }
 
 // TODO: also use this for outdated check(?)
@@ -66,7 +94,7 @@ impl Connection {
         target: &str,
         package: &str,
         version: &str,
-    ) -> Result<Option<bool>, Error> {
+    ) -> Result<Option<CrateStatus>, Error> {
         let path = self.cache_path(target, package, version);
 
         if !path.exists() {
@@ -74,13 +102,15 @@ impl Connection {
         }
 
         let buf = fs::read(path)?;
-        let cache: CacheEntry = serde_json::from_slice(&buf)?;
-
-        if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
-            Ok(None)
-        } else {
-            Ok(Some(cache.found))
+        // ignore I/O and deserialization errors when trying to read the cache
+        if let Ok(cache) = serde_json::from_slice::<CacheEntry>(&buf) {
+            if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
+                return Ok(None);
+            } else {
+                return Ok(Some(cache.crate_status));
+            }
         }
+        Ok(None)
     }
 
     fn write_cache(
@@ -88,49 +118,53 @@ impl Connection {
         target: &str,
         package: &str,
         version: &str,
-        found: bool,
+        crate_status: CrateStatus,
     ) -> Result<(), Error> {
         let cache = CacheEntry {
             from: SystemTime::now(),
-            found,
+            crate_status,
         };
         let buf = serde_json::to_vec(&cache)?;
         fs::write(self.cache_path(target, package, version), buf)?;
         Ok(())
     }
 
-    pub fn search(&mut self, package: &str, version: &str) -> Result<bool, Error> {
-        if let Some(found) = self.check_cache("sid", package, version)? {
-            return Ok(found);
+    pub fn search(&mut self, package: &str, version: &str) -> Result<CrateStatus, Error> {
+        if let Some(crate_status) = self.check_cache("sid", package, version)? {
+            return Ok(crate_status);
         }
 
         // config.shell().status("Querying", format!("sid: {}", package))?;
         info!("Querying -> sid: {}", package);
-        let found = self.search_generic(
+        let crate_status = self.search_generic(
             "SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
             package,
             version,
         )?;
 
-        self.write_cache("sid", package, version, found)?;
-        Ok(found)
+        self.write_cache("sid", package, version, crate_status)?;
+        Ok(crate_status)
     }
 
-    pub fn search_new(&mut self, package: &str, version: &str) -> Result<bool, Error> {
-        if let Some(found) = self.check_cache("new", package, version)? {
-            return Ok(found);
+    pub fn search_new(&mut self, package: &str, version: &str) -> Result<CrateStatus, Error> {
+        if let Some(crate_status) = self.check_cache("new", package, version)? {
+            return Ok(crate_status);
         }
 
         // config.shell().status("Querying", format!("new: {}", package))?;
         info!("Querying -> new: {}", package);
-        let found = self.search_generic(
+        let mut crate_status = self.search_generic(
             "SELECT version::text FROM new_sources WHERE source=$1;",
             package,
             version,
         )?;
 
-        self.write_cache("new", package, version, found)?;
-        Ok(found)
+        if crate_status == CrateStatus::Available {
+            crate_status = CrateStatus::AvailableInNew;
+        }
+
+        self.write_cache("new", package, version, crate_status)?;
+        Ok(crate_status)
     }
 
     pub fn search_generic(
@@ -138,7 +172,7 @@ impl Connection {
         query: &str,
         package: &str,
         version: &str,
-    ) -> Result<bool, Error> {
+    ) -> Result<CrateStatus, Error> {
         let package = package.replace('_', "-");
         let rows = self.sock.query(query, &[&format!("rust-{package}")])?;
 
@@ -153,11 +187,15 @@ impl Connection {
             // println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
 
             if is_compatible(debversion, version)? {
-                return Ok(true);
+                return Ok(CrateStatus::Available);
             }
         }
 
-        Ok(false)
+        if !rows.is_empty() {
+            return Ok(CrateStatus::Outdated);
+        }
+
+        Ok(CrateStatus::Missing)
     }
 }
 

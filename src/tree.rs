@@ -68,7 +68,16 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
             }
 
             let root = &graph.graph[graph.nodes[*package]];
-            print_tree(graph, root, &format, direction, symbols, prefix, args.all);
+            print_tree(
+                graph,
+                root,
+                &format,
+                direction,
+                symbols,
+                prefix,
+                args.all,
+                args.only_missing,
+            );
         }
     } else {
         let root = match &args.package {
@@ -79,7 +88,16 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
         };
         let root = &graph.graph[graph.nodes[root]];
 
-        print_tree(graph, root, &format, direction, symbols, prefix, args.all);
+        print_tree(
+            graph,
+            root,
+            &format,
+            direction,
+            symbols,
+            prefix,
+            args.all,
+            args.only_missing,
+        );
     }
 
     Ok(())
@@ -158,6 +176,7 @@ fn print_tree<'a>(
     symbols: &Symbols,
     prefix: Prefix,
     all: bool,
+    only_missing: bool,
 ) {
     let mut visited_deps = HashSet::new();
     let mut levels_continue = vec![];
@@ -170,6 +189,7 @@ fn print_tree<'a>(
         symbols,
         prefix,
         all,
+        only_missing,
         &mut visited_deps,
         &mut levels_continue,
     );
@@ -183,9 +203,14 @@ fn print_package<'a>(
     symbols: &Symbols,
     prefix: Prefix,
     all: bool,
+    only_missing: bool,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
 ) {
+    if only_missing && package.in_debian() {
+        return;
+    }
+
     match prefix {
         Prefix::Depth => print!("{}", levels_continue.len()),
         Prefix::Indent => {
@@ -225,6 +250,7 @@ fn print_package<'a>(
             symbols,
             prefix,
             all,
+            only_missing,
             visited_deps,
             levels_continue,
             *kind,
@@ -240,6 +266,7 @@ fn print_dependencies<'a>(
     symbols: &Symbols,
     prefix: Prefix,
     all: bool,
+    only_missing: bool,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     kind: DependencyKind,
@@ -294,6 +321,7 @@ fn print_dependencies<'a>(
             symbols,
             prefix,
             all,
+            only_missing,
             visited_deps,
             levels_continue,
         );
