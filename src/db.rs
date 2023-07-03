@@ -46,15 +46,16 @@ impl Connection {
         Ok(Connection { sock, cache_dir })
     }
 
-    fn cache_path(&self, target: &str, package: &str, version: &str) -> PathBuf {
-        self.cache_dir.join(format!("{target}-{package}-{version}"))
+    fn cache_path(&self, target: &str, package: &str, version: &Version) -> PathBuf {
+        self.cache_dir
+            .join(format!("{target}-{package}-{}", version))
     }
 
     fn check_cache(
         &self,
         target: &str,
         package: &str,
-        version: &str,
+        version: &Version,
     ) -> Result<Option<bool>, Error> {
         let path = self.cache_path(target, package, version);
 
@@ -76,7 +77,7 @@ impl Connection {
         &self,
         target: &str,
         package: &str,
-        version: &str,
+        version: &Version,
         found: bool,
     ) -> Result<(), Error> {
         let cache = CacheEntry {
@@ -88,7 +89,7 @@ impl Connection {
         Ok(())
     }
 
-    pub fn search(&mut self, package: &str, version: &str) -> Result<bool, Error> {
+    pub fn search(&mut self, package: &str, version: &Version) -> Result<bool, Error> {
         if let Some(found) = self.check_cache("sid", package, version)? {
             return Ok(found);
         }
@@ -96,7 +97,7 @@ impl Connection {
         // config.shell().status("Querying", format!("sid: {}", package))?;
         info!("Querying -> sid: {}", package);
         let found = self.search_generic(
-            "SELECT version::text FROM sources WHERE source=$1 AND release='sid';",
+            "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
             package,
             version,
         )?;
@@ -105,7 +106,7 @@ impl Connection {
         Ok(found)
     }
 
-    pub fn search_new(&mut self, package: &str, version: &str) -> Result<bool, Error> {
+    pub fn search_new(&mut self, package: &str, version: &Version) -> Result<bool, Error> {
         if let Some(found) = self.check_cache("new", package, version)? {
             return Ok(found);
         }
@@ -113,7 +114,7 @@ impl Connection {
         // config.shell().status("Querying", format!("new: {}", package))?;
         info!("Querying -> new: {}", package);
         let found = self.search_generic(
-            "SELECT version::text FROM new_sources WHERE source=$1;",
+            "SELECT version::text FROM new_sources WHERE source in ($1, $2);",
             package,
             version,
         )?;
@@ -126,12 +127,20 @@ impl Connection {
         &mut self,
         query: &str,
         package: &str,
-        version: &str,
+        version: &Version,
     ) -> Result<bool, Error> {
         let package = package.replace('_', "-");
-        let rows = self.sock.query(query, &[&format!("rust-{package}")])?;
+        let semver_package = if version.major == 0 {
+            format!("rust-{package}-{}.{}", version.major, version.minor)
+        } else {
+            format!("rust-{package}-{}", version.major)
+        };
+        let rows = self
+            .sock
+            .query(query, &[&format!("rust-{package}"), &semver_package])?;
 
-        let version = VersionReq::parse(version)?;
+        let version = version.to_string();
+        let version = VersionReq::parse(&version)?;
         for row in &rows {
             let debversion: String = row.get(0);
 
