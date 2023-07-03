@@ -61,9 +61,9 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
         outdated: false,
     };
 
-    if db.search(&pkg.name, &pkg.version.to_string()).unwrap() {
+    if db.search(&pkg.name, &pkg.version).unwrap() {
         deb.in_unstable = true;
-    } else if db.search_new(&pkg.name, &pkg.version.to_string()).unwrap() {
+    } else if db.search_new(&pkg.name, &pkg.version).unwrap() {
         deb.in_new = true;
     }
 
