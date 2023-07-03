@@ -1,6 +1,6 @@
 use crate::errors::*;
 use postgres::{Client, NoTls};
-use semver::Version;
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -16,22 +16,11 @@ pub struct CacheEntry {
 }
 
 // TODO: also use this for outdated check(?)
-fn is_compatible(debversion: &str, crateversion: &str) -> Result<bool, Error> {
+fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
     let debversion = debversion.replace('~', "-");
-    let crateversion = crateversion.replace('~', "-");
-
     let debversion = Version::parse(&debversion)?;
-    let crateversion = Version::parse(&crateversion)?;
 
-    if debversion.major > 0 || crateversion.major > 0 {
-        return Ok(debversion.major == crateversion.major);
-    }
-
-    if debversion.minor > 0 || crateversion.minor > 0 {
-        return Ok(debversion.minor == crateversion.minor);
-    }
-
-    Ok(debversion.patch == crateversion.patch)
+    Ok(crateversion.matches(&debversion))
 }
 
 pub struct Connection {
@@ -142,6 +131,7 @@ impl Connection {
         let package = package.replace('_', "-");
         let rows = self.sock.query(query, &[&format!("rust-{package}")])?;
 
+        let version = VersionReq::parse(version)?;
         for row in &rows {
             let debversion: String = row.get(0);
 
@@ -152,7 +142,7 @@ impl Connection {
 
             // println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
 
-            if is_compatible(debversion, version)? {
+            if is_compatible(debversion, &version)? {
                 return Ok(true);
             }
         }
@@ -164,9 +154,21 @@ impl Connection {
 #[cfg(test)]
 mod tests {
     use crate::db::is_compatible;
+    use semver::VersionReq;
 
     #[test]
     fn is_compatible_with_tilde() {
-        assert!(is_compatible("1.0.0~alpha.9", "1.0.0-alpha.9").unwrap());
+        assert!(is_compatible(
+            "1.0.0~alpha.9",
+            &VersionReq::parse("1.0.0-alpha.9").unwrap()
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn is_compatible_follows_semver() {
+        assert!(is_compatible("0.1.1", &VersionReq::parse("0.1.0").unwrap()).unwrap());
+        assert!(!is_compatible("0.1.0", &VersionReq::parse("0.1.1").unwrap()).unwrap());
+        assert!(is_compatible("1.1.0", &VersionReq::parse("1").unwrap()).unwrap());
     }
 }
