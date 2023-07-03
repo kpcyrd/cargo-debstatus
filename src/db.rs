@@ -16,22 +16,22 @@ pub struct CacheEntry {
 }
 
 // TODO: also use this for outdated check(?)
-fn is_compatible(a: &str, b: &str) -> Result<bool, Error> {
-    let a = a.replace('~', "-");
-    let b = b.replace('~', "-");
+fn is_compatible(debversion: &str, crateversion: &str) -> Result<bool, Error> {
+    let debversion = debversion.replace('~', "-");
+    let crateversion = crateversion.replace('~', "-");
 
-    let a = Version::parse(&a)?;
-    let b = Version::parse(&b)?;
+    let debversion = Version::parse(&debversion)?;
+    let crateversion = Version::parse(&crateversion)?;
 
-    if a.major > 0 || b.major > 0 {
-        return Ok(a.major == b.major);
+    if debversion.major > 0 || crateversion.major > 0 {
+        return Ok(debversion.major == crateversion.major);
     }
 
-    if a.minor > 0 || b.minor > 0 {
-        return Ok(a.minor == b.minor);
+    if debversion.minor > 0 || crateversion.minor > 0 {
+        return Ok(debversion.minor == crateversion.minor);
     }
 
-    Ok(a.patch == b.patch)
+    Ok(debversion.patch == crateversion.patch)
 }
 
 pub struct Connection {
