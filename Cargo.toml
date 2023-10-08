@@ -1,6 +1,6 @@
 [package]
 name = "cargo-debstatus"
-version = "0.5.0"
+version = "0.5.1"
 description = "cargo-tree for debian packaging"
 authors = ["kpcyrd <git@rxv.cc>",
            "Steven Fackler <sfackler@gmail.com>"]
