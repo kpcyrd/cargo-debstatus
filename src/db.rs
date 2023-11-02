@@ -130,17 +130,26 @@ impl Connection {
         version: &Version,
     ) -> Result<bool, Error> {
         let package = package.replace('_', "-");
-        let semver_package = if version.major == 0 {
-            format!("rust-{package}-{}.{}", version.major, version.minor)
+        let semver_version = if version.major == 0 {
+            if version.minor == 0 {
+                format!("{}.{}.{}", version.major, version.minor, version.patch)
+            } else {
+                format!("{}.{}", version.major, version.minor)
+            }
         } else {
-            format!("rust-{package}-{}", version.major)
+            format!("{}", version.major)
         };
-        let rows = self
-            .sock
-            .query(query, &[&format!("rust-{package}"), &semver_package])?;
+        let rows = self.sock.query(
+            query,
+            &[
+                &format!("rust-{package}"),
+                &format!("rust-{package}-{}", semver_version),
+            ],
+        )?;
 
         let version = version.to_string();
         let version = VersionReq::parse(&version)?;
+        let semver_version = VersionReq::parse(&semver_version)?;
         for row in &rows {
             let debversion: String = row.get(0);
 
@@ -151,7 +160,7 @@ impl Connection {
 
             // println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
 
-            if is_compatible(debversion, &version)? {
+            if is_compatible(debversion, &version)? || is_compatible(debversion, &semver_version)? {
                 return Ok(true);
             }
         }
