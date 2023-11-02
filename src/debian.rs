@@ -1,4 +1,4 @@
-use crate::db::Connection;
+use crate::db::{Connection, PkgStatus};
 use crate::errors::*;
 use crate::graph::Graph;
 use cargo_metadata::{Package, PackageId, Source};
@@ -52,6 +52,8 @@ pub struct DebianInfo {
     pub in_unstable: bool,
     pub in_new: bool,
     pub outdated: bool,
+    pub compatible: bool,
+    pub version: String,
 }
 
 fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
@@ -59,12 +61,26 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
         in_unstable: false,
         in_new: false,
         outdated: false,
+        compatible: false,
+        version: String::new(),
     };
 
-    if db.search(&pkg.name, &pkg.version).unwrap() {
+    let mut info = db.search(&pkg.name, &pkg.version).unwrap();
+    if info.status == PkgStatus::NotFound {
+        info = db.search_new(&pkg.name, &pkg.version).unwrap();
+        if info.status != PkgStatus::NotFound {
+            deb.in_new = true;
+            deb.version = info.version;
+        }
+    } else {
         deb.in_unstable = true;
-    } else if db.search_new(&pkg.name, &pkg.version).unwrap() {
-        deb.in_new = true;
+        deb.version = info.version;
+    }
+
+    match info.status {
+        PkgStatus::Outdated => deb.outdated = true,
+        PkgStatus::Compatible => deb.compatible = true,
+        _ => (),
     }
 
     Ok(deb)

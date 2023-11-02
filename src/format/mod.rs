@@ -58,11 +58,29 @@ impl<'a> fmt::Display for Display<'a> {
                     let pkg = format!("{} v{}", self.package.name, self.package.version);
                     if let Some(deb) = &self.package.debinfo {
                         if deb.in_unstable {
-                            write!(fmt, "{} (in debian)", pkg.green())?;
+                            if deb.compatible {
+                                write!(
+                                    fmt,
+                                    "{} ({} in debian)",
+                                    pkg.green(),
+                                    deb.version.yellow()
+                                )?;
+                            } else {
+                                write!(fmt, "{} (in debian)", pkg.green())?;
+                            }
                         } else if deb.in_new {
-                            write!(fmt, "{} (in debian NEW queue)", pkg.blue())?;
+                            if deb.compatible {
+                                write!(
+                                    fmt,
+                                    "{} ({} in debian NEW queue)",
+                                    pkg.blue(),
+                                    deb.version.yellow()
+                                )?;
+                            } else {
+                                write!(fmt, "{} (in debian NEW queue)", pkg.blue())?;
+                            }
                         } else if deb.outdated {
-                            write!(fmt, "{} (outdated)", pkg.yellow())?;
+                            write!(fmt, "{} (outdated, {})", pkg.red(), deb.version)?;
                         } else {
                             write!(fmt, "{pkg}")?;
                         }
