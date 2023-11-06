@@ -204,8 +204,8 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::is_compatible;
-    use semver::VersionReq;
+    use crate::db::{is_compatible, Connection, PkgStatus};
+    use semver::{Version, VersionReq};
 
     #[test]
     fn is_compatible_with_tilde() {
@@ -221,5 +221,31 @@ mod tests {
         assert!(is_compatible("0.1.1", &VersionReq::parse("0.1.0").unwrap()).unwrap());
         assert!(!is_compatible("0.1.0", &VersionReq::parse("0.1.1").unwrap()).unwrap());
         assert!(is_compatible("1.1.0", &VersionReq::parse("1").unwrap()).unwrap());
+    }
+
+    #[test]
+    #[ignore]
+    fn check_version_reqs() {
+        let mut db = Connection::new().unwrap();
+        // Debian bullseye has rust-serde v1.0.106 and shouldn't be updated anymore
+        let query =
+            "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='bullseye';";
+        let info = db
+            .search_generic(query, "serde", &Version::parse("1.0.100").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Found);
+        assert_eq!(info.version, "1.0.106");
+        let info = db
+            .search_generic(query, "serde", &Version::parse("1.0.150").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Compatible);
+        let info = db
+            .search_generic(query, "serde", &Version::parse("2.0.0").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Outdated);
+        let info = db
+            .search_generic(query, "notacrate", &Version::parse("1.0.0").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::NotFound);
     }
 }
