@@ -206,6 +206,13 @@ fn print_package<'a>(
         Prefix::None => {}
     }
 
+    if !all && visited_deps.contains(&package.id) {
+        println!("{} (*)", format.display(package));
+        return;
+    }
+
+    visited_deps.insert(&package.id);
+
     println!("{}", format.display(package));
 
     if package.in_debian() {
