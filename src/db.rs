@@ -9,13 +9,26 @@ use std::time::{Duration, SystemTime};
 const POSTGRES: &str = "postgresql://udd-mirror:udd-mirror@udd-mirror.debian.net/udd";
 const CACHE_EXPIRE: Duration = Duration::from_secs(90 * 60);
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum PkgStatus {
+    NotFound,
+    Outdated,
+    Compatible,
+    Found,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PkgInfo {
+    pub status: PkgStatus,
+    pub version: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CacheEntry {
     pub from: SystemTime,
-    pub found: bool,
+    pub info: PkgInfo,
 }
 
-// TODO: also use this for outdated check(?)
 fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
     let debversion = debversion.replace('~', "-");
     let debversion = Version::parse(&debversion)?;
@@ -56,20 +69,28 @@ impl Connection {
         target: &str,
         package: &str,
         version: &Version,
-    ) -> Result<Option<bool>, Error> {
+    ) -> Result<Option<PkgInfo>, Error> {
         let path = self.cache_path(target, package, version);
 
         if !path.exists() {
             return Ok(None);
         }
 
-        let buf = fs::read(path)?;
-        let cache: CacheEntry = serde_json::from_slice(&buf)?;
+        let buf = fs::read(&path)?;
+        // If the cache entry can't be deserialized, it's probably using an old
+        // entry format, so let's discard it
+        let cache: CacheEntry = match serde_json::from_slice(&buf) {
+            Ok(e) => e,
+            _ => {
+                fs::remove_file(path)?;
+                return Ok(None);
+            }
+        };
 
         if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
             Ok(None)
         } else {
-            Ok(Some(cache.found))
+            Ok(Some(cache.info))
         }
     }
 
@@ -78,49 +99,49 @@ impl Connection {
         target: &str,
         package: &str,
         version: &Version,
-        found: bool,
+        info: &PkgInfo,
     ) -> Result<(), Error> {
         let cache = CacheEntry {
             from: SystemTime::now(),
-            found,
+            info: info.clone(),
         };
         let buf = serde_json::to_vec(&cache)?;
         fs::write(self.cache_path(target, package, version), buf)?;
         Ok(())
     }
 
-    pub fn search(&mut self, package: &str, version: &Version) -> Result<bool, Error> {
-        if let Some(found) = self.check_cache("sid", package, version)? {
-            return Ok(found);
+    pub fn search(&mut self, package: &str, version: &Version) -> Result<PkgInfo, Error> {
+        if let Some(info) = self.check_cache("sid", package, version)? {
+            return Ok(info);
         }
 
         // config.shell().status("Querying", format!("sid: {}", package))?;
         info!("Querying -> sid: {}", package);
-        let found = self.search_generic(
+        let info = self.search_generic(
             "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
             package,
             version,
         )?;
 
-        self.write_cache("sid", package, version, found)?;
-        Ok(found)
+        self.write_cache("sid", package, version, &info)?;
+        Ok(info)
     }
 
-    pub fn search_new(&mut self, package: &str, version: &Version) -> Result<bool, Error> {
-        if let Some(found) = self.check_cache("new", package, version)? {
-            return Ok(found);
+    pub fn search_new(&mut self, package: &str, version: &Version) -> Result<PkgInfo, Error> {
+        if let Some(info) = self.check_cache("new", package, version)? {
+            return Ok(info);
         }
 
         // config.shell().status("Querying", format!("new: {}", package))?;
         info!("Querying -> new: {}", package);
-        let found = self.search_generic(
+        let info = self.search_generic(
             "SELECT version::text FROM new_sources WHERE source in ($1, $2);",
             package,
             version,
         )?;
 
-        self.write_cache("new", package, version, found)?;
-        Ok(found)
+        self.write_cache("new", package, version, &info)?;
+        Ok(info)
     }
 
     pub fn search_generic(
@@ -128,19 +149,32 @@ impl Connection {
         query: &str,
         package: &str,
         version: &Version,
-    ) -> Result<bool, Error> {
-        let package = package.replace('_', "-");
-        let semver_package = if version.major == 0 {
-            format!("rust-{package}-{}.{}", version.major, version.minor)
-        } else {
-            format!("rust-{package}-{}", version.major)
+    ) -> Result<PkgInfo, Error> {
+        let mut info = PkgInfo {
+            status: PkgStatus::NotFound,
+            version: String::new(),
         };
-        let rows = self
-            .sock
-            .query(query, &[&format!("rust-{package}"), &semver_package])?;
+        let package = package.replace('_', "-");
+        let semver_version = if version.major == 0 {
+            if version.minor == 0 {
+                format!("{}.{}.{}", version.major, version.minor, version.patch)
+            } else {
+                format!("{}.{}", version.major, version.minor)
+            }
+        } else {
+            format!("{}", version.major)
+        };
+        let rows = self.sock.query(
+            query,
+            &[
+                &format!("rust-{package}"),
+                &format!("rust-{package}-{}", semver_version),
+            ],
+        )?;
 
         let version = version.to_string();
         let version = VersionReq::parse(&version)?;
+        let semver_version = VersionReq::parse(&semver_version)?;
         for row in &rows {
             let debversion: String = row.get(0);
 
@@ -152,18 +186,26 @@ impl Connection {
             // println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
 
             if is_compatible(debversion, &version)? {
-                return Ok(true);
+                info.version = debversion.to_string();
+                info.status = PkgStatus::Found;
+                return Ok(info);
+            } else if is_compatible(debversion, &semver_version)? {
+                info.version = debversion.to_string();
+                info.status = PkgStatus::Compatible;
+            } else if info.status == PkgStatus::NotFound {
+                info.version = debversion.to_string();
+                info.status = PkgStatus::Outdated;
             }
         }
 
-        Ok(false)
+        Ok(info)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::db::is_compatible;
-    use semver::VersionReq;
+    use crate::db::{is_compatible, Connection, PkgStatus};
+    use semver::{Version, VersionReq};
 
     #[test]
     fn is_compatible_with_tilde() {
@@ -179,5 +221,31 @@ mod tests {
         assert!(is_compatible("0.1.1", &VersionReq::parse("0.1.0").unwrap()).unwrap());
         assert!(!is_compatible("0.1.0", &VersionReq::parse("0.1.1").unwrap()).unwrap());
         assert!(is_compatible("1.1.0", &VersionReq::parse("1").unwrap()).unwrap());
+    }
+
+    #[test]
+    #[ignore]
+    fn check_version_reqs() {
+        let mut db = Connection::new().unwrap();
+        // Debian bullseye has rust-serde v1.0.106 and shouldn't be updated anymore
+        let query =
+            "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='bullseye';";
+        let info = db
+            .search_generic(query, "serde", &Version::parse("1.0.100").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Found);
+        assert_eq!(info.version, "1.0.106");
+        let info = db
+            .search_generic(query, "serde", &Version::parse("1.0.150").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Compatible);
+        let info = db
+            .search_generic(query, "serde", &Version::parse("2.0.0").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Outdated);
+        let info = db
+            .search_generic(query, "notacrate", &Version::parse("1.0.0").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::NotFound);
     }
 }
