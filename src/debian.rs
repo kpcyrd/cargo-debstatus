@@ -45,6 +45,18 @@ impl Pkg {
             false
         }
     }
+
+    pub fn show_dependencies(&self) -> bool {
+        if !self.in_debian() {
+            return true;
+        }
+
+        if let Some(deb) = &self.debinfo {
+            !deb.exact_match && (deb.outdated || !deb.compatible)
+        } else {
+            true
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +65,7 @@ pub struct DebianInfo {
     pub in_new: bool,
     pub outdated: bool,
     pub compatible: bool,
+    pub exact_match: bool,
     pub version: String,
 }
 
@@ -62,6 +75,7 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
         in_new: false,
         outdated: false,
         compatible: false,
+        exact_match: false,
         version: String::new(),
     };
 
@@ -80,6 +94,7 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
     match info.status {
         PkgStatus::Outdated => deb.outdated = true,
         PkgStatus::Compatible => deb.compatible = true,
+        PkgStatus::Found => deb.exact_match = true,
         _ => (),
     }
 

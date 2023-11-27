@@ -208,7 +208,7 @@ fn print_package<'a>(
 
     println!("{}", format.display(package));
 
-    if package.in_debian() {
+    if !package.show_dependencies() {
         return;
     }
 

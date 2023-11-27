@@ -90,6 +90,7 @@ impl Connection {
         if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
             Ok(None)
         } else {
+            debug!("{package} {:?}", cache.info);
             Ok(Some(cache.info))
         }
     }
@@ -188,6 +189,7 @@ impl Connection {
             if is_compatible(debversion, &version)? {
                 info.version = debversion.to_string();
                 info.status = PkgStatus::Found;
+                debug!("{package} {:?}", info);
                 return Ok(info);
             } else if is_compatible(debversion, &semver_version)? {
                 info.version = debversion.to_string();
@@ -198,6 +200,7 @@ impl Connection {
             }
         }
 
+        debug!("{package} {:?}", info);
         Ok(info)
     }
 }
