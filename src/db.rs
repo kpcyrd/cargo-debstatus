@@ -248,4 +248,26 @@ mod tests {
             .unwrap();
         assert_eq!(info.status, PkgStatus::NotFound);
     }
+
+    #[test]
+    #[ignore]
+    fn check_zerover_version_reqs() {
+        let mut db = Connection::new().unwrap();
+        // Debian bookworm has rust-zoxide v0.4.3 and shouldn't be updated anymore
+        let query =
+            "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='bookworm';";
+        let info = db
+            .search_generic(query, "zoxide", &Version::parse("0.4.1").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Found);
+        assert_eq!(info.version, "0.4.3");
+        let info = db
+            .search_generic(query, "zoxide", &Version::parse("0.4.5").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Compatible);
+        let info = db
+            .search_generic(query, "zoxide", &Version::parse("0.5.0").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Outdated);
+    }
 }
