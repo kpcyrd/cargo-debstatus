@@ -30,7 +30,22 @@ pub struct CacheEntry {
 }
 
 fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
-    let debversion = debversion.replace('~', "-");
+    let mut debversion = debversion.replace('~', "-");
+    if debversion.contains('+') {
+        let parts: Vec<&str> = debversion.split('+').collect();
+        debversion = match parts[0].matches('.').count() {
+            0 => {
+                format!("{}.0.0", parts[0])
+            }
+            1 => {
+                format!("{}.0", parts[0])
+            }
+            2 => parts[0].to_owned(),
+            _ => {
+                return Err(anyhow!("wrong number of '.' characters in semver string"));
+            }
+        };
+    }
     let debversion = Version::parse(&debversion)?;
 
     Ok(crateversion.matches(&debversion))
@@ -183,7 +198,7 @@ impl Connection {
                 _ => &debversion,
             };
 
-            // println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, version)?);
+            //println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, &version));
 
             if is_compatible(debversion, &version)? {
                 info.version = debversion.to_string();
@@ -214,6 +229,11 @@ mod tests {
             &VersionReq::parse("1.0.0-alpha.9").unwrap()
         )
         .unwrap());
+    }
+
+    #[test]
+    fn is_compatible_with_plus() {
+        assert!(is_compatible("4+20231122+dfsg", &VersionReq::parse("4.0.0").unwrap()).unwrap());
     }
 
     #[test]
