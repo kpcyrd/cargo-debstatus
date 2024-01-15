@@ -31,19 +31,12 @@ pub struct CacheEntry {
 
 fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
     let mut debversion = debversion.replace('~', "-");
-    if debversion.contains('+') {
-        let parts: Vec<&str> = debversion.split('+').collect();
-        debversion = match parts[0].matches('.').count() {
-            0 => {
-                format!("{}.0.0", parts[0])
-            }
-            1 => {
-                format!("{}.0", parts[0])
-            }
-            2 => parts[0].to_owned(),
-            _ => {
-                return Err(anyhow!("wrong number of '.' characters in semver string"));
-            }
+    if let Some((version, _suffix)) = debversion.split_once('+') {
+        debversion = match version.matches('.').count() {
+            0 => format!("{version}.0.0"),
+            1 => format!("{version}.0"),
+            2 => version.to_owned(),
+            _ => bail!("wrong number of '.' characters in semver string: {version:?}"),
         };
     }
     let debversion = Version::parse(&debversion)?;
