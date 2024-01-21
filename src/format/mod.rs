@@ -65,6 +65,13 @@ impl<'a> fmt::Display for Display<'a> {
                                     pkg.green(),
                                     deb.version.yellow()
                                 )?;
+                            } else if deb.outdated {
+                                write!(
+                                    fmt,
+                                    "{} (outdated, {} in debian)",
+                                    pkg.yellow(),
+                                    deb.version.red()
+                                )?;
                             } else {
                                 write!(fmt, "{} (in debian)", pkg.green())?;
                             }
@@ -76,11 +83,18 @@ impl<'a> fmt::Display for Display<'a> {
                                     pkg.blue(),
                                     deb.version.yellow()
                                 )?;
+                            } else if deb.outdated {
+                                write!(
+                                    fmt,
+                                    "{}, (outdated, {} in debian NEW queue)",
+                                    pkg.blue(),
+                                    deb.version.red()
+                                )?;
                             } else {
                                 write!(fmt, "{} (in debian NEW queue)", pkg.blue())?;
                             }
                         } else if deb.outdated {
-                            write!(fmt, "{} (outdated, {})", pkg.red(), deb.version)?;
+                            write!(fmt, "{} (outdated, {})", pkg.red(), deb.version.red())?;
                         } else {
                             write!(fmt, "{pkg}")?;
                         }

@@ -98,6 +98,7 @@ impl Connection {
         if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
             Ok(None)
         } else {
+            debug!("{package} {:?}", cache.info);
             Ok(Some(cache.info))
         }
     }
@@ -196,6 +197,7 @@ impl Connection {
             if is_compatible(debversion, &version)? {
                 info.version = debversion.to_string();
                 info.status = PkgStatus::Found;
+                debug!("{package} {:?}", info);
                 return Ok(info);
             } else if is_compatible(debversion, &semver_version)? {
                 info.version = debversion.to_string();
@@ -206,6 +208,7 @@ impl Connection {
             }
         }
 
+        debug!("{package} {:?}", info);
         Ok(info)
     }
 }
@@ -260,5 +263,27 @@ mod tests {
             .search_generic(query, "notacrate", &Version::parse("1.0.0").unwrap())
             .unwrap();
         assert_eq!(info.status, PkgStatus::NotFound);
+    }
+
+    #[test]
+    #[ignore]
+    fn check_zerover_version_reqs() {
+        let mut db = Connection::new().unwrap();
+        // Debian bookworm has rust-zoxide v0.4.3 and shouldn't be updated anymore
+        let query =
+            "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='bookworm';";
+        let info = db
+            .search_generic(query, "zoxide", &Version::parse("0.4.1").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Found);
+        assert_eq!(info.version, "0.4.3");
+        let info = db
+            .search_generic(query, "zoxide", &Version::parse("0.4.5").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Compatible);
+        let info = db
+            .search_generic(query, "zoxide", &Version::parse("0.5.0").unwrap())
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Outdated);
     }
 }
