@@ -23,6 +23,29 @@ pub struct Pkg {
     pub debinfo: Option<DebianInfo>,
 }
 
+pub enum PackagingProgress {
+    Available,
+    AvailableInNew,
+    NeedsUpdate,
+    Missing,
+}
+
+use std::fmt;
+
+impl fmt::Display for PackagingProgress {
+    //! Generate icons to display the packaging progress.
+    //! They should all take the same width when printed in a terminal
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let icon = match self {
+            PackagingProgress::Available => "  ",
+            PackagingProgress::AvailableInNew => " N",
+            PackagingProgress::NeedsUpdate => "⌛",
+            PackagingProgress::Missing => "🔴",
+        };
+        write!(f, "{}", icon)
+    }
+}
+
 impl Pkg {
     pub fn new(pkg: Package) -> Pkg {
         Pkg {
@@ -55,6 +78,36 @@ impl Pkg {
             !deb.exact_match && (deb.outdated || !deb.compatible)
         } else {
             true
+        }
+    }
+
+    pub fn packaging_status(&self) -> PackagingProgress {
+        if let Some(deb) = &self.debinfo {
+            if deb.in_unstable {
+                if deb.compatible {
+                    // Available at an older yet compatible version
+                    PackagingProgress::Available
+                } else if deb.outdated {
+                    PackagingProgress::NeedsUpdate
+                } else {
+                    PackagingProgress::Available
+                }
+            } else if deb.in_new {
+                if deb.compatible {
+                    PackagingProgress::AvailableInNew
+                } else if deb.outdated {
+                    // Outdated; in the NEW queue
+                    PackagingProgress::NeedsUpdate
+                } else {
+                    PackagingProgress::AvailableInNew
+                }
+            } else if deb.outdated {
+                PackagingProgress::NeedsUpdate
+            } else {
+                PackagingProgress::Missing
+            }
+        } else {
+            PackagingProgress::Missing
         }
     }
 }

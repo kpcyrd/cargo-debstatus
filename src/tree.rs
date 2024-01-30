@@ -186,27 +186,33 @@ fn print_package<'a>(
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
 ) {
-    match prefix {
-        Prefix::Depth => print!("{}", levels_continue.len()),
-        Prefix::Indent => {
-            if let Some((last_continues, rest)) = levels_continue.split_last() {
-                for continues in rest {
-                    let c = if *continues { symbols.down } else { " " };
-                    print!("{c}   ");
+    let treeline = {
+        let mut line = "".to_string();
+        line.push_str(&format!(" {} ", &package.packaging_status()));
+        match prefix {
+            Prefix::Depth => line.push_str(&format!("{}", levels_continue.len())),
+            Prefix::Indent => {
+                if let Some((last_continues, rest)) = levels_continue.split_last() {
+                    for continues in rest {
+                        let c = if *continues { symbols.down } else { " " };
+                        line.push_str(&format!("{c}   "));
+                    }
+
+                    let c = if *last_continues {
+                        symbols.tee
+                    } else {
+                        symbols.ell
+                    };
+                    line.push_str(&format!("{0}{1}{1} ", c, symbols.right));
                 }
-
-                let c = if *last_continues {
-                    symbols.tee
-                } else {
-                    symbols.ell
-                };
-                print!("{0}{1}{1} ", c, symbols.right);
             }
+            Prefix::None => {}
         }
-        Prefix::None => {}
-    }
+        line
+    };
 
-    println!("{}", format.display(package));
+    let pkg_status_s = format.display(package).to_string();
+    println!("{}{}", treeline, pkg_status_s);
 
     if !all && !package.show_dependencies() {
         return;
