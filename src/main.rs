@@ -1,6 +1,6 @@
 use crate::args::Opts;
 use crate::errors::*;
-use structopt::StructOpt;
+use clap::Parser;
 
 mod args;
 mod db;
@@ -14,7 +14,7 @@ mod tree;
 fn main() -> Result<(), Error> {
     env_logger::init();
 
-    let Opts::Tree(args) = Opts::from_args();
+    let Opts::Tree(args) = Opts::parse();
     info!("Reading metadata");
     let metadata = metadata::get(&args)?;
     info!("Building graph");

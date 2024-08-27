@@ -13,10 +13,10 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 cargo_metadata = "0.15"
+clap = { version = "4.5.16", features = ["derive"] }
 petgraph = "0.6"
 semver = "1"
 serde_json = "1.0"
-structopt = "0.3"
 
 colored = "2"
 postgres = "0.19"
