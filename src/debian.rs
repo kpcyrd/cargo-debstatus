@@ -154,7 +154,7 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
     Ok(deb)
 }
 
-pub fn populate(graph: &mut Graph) -> Result<(), Error> {
+pub fn populate(graph: &mut Graph, quiet: bool) -> Result<(), Error> {
     let (task_tx, task_rx) = crossbeam_channel::unbounded();
     let (return_tx, return_rx) = crossbeam_channel::unbounded();
 
@@ -196,12 +196,16 @@ pub fn populate(graph: &mut Graph) -> Result<(), Error> {
 
     info!("Processing debian results");
 
-    let pb = ProgressBar::new(jobs as u64)
-        .with_style(
-            ProgressStyle::default_bar()
-                .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}")?,
-        )
-        .with_prefix("Resolving debian packages");
+    let pb = if quiet {
+        ProgressBar::hidden()
+    } else {
+        ProgressBar::new(jobs as u64)
+            .with_style(
+                ProgressStyle::default_bar()
+                    .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}")?,
+            )
+            .with_prefix("Resolving debian packages")
+    };
     pb.tick();
 
     for result in return_rx.iter().take(jobs) {

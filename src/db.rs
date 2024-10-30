@@ -98,7 +98,7 @@ impl Connection {
         if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
             Ok(None)
         } else {
-            debug!("{package} {:?}", cache.info);
+            debug!("Found package in cache: {package} -> {:?}", cache.info);
             Ok(Some(cache.info))
         }
     }

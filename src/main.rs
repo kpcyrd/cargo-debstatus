@@ -20,7 +20,7 @@ fn main() -> Result<(), Error> {
     info!("Building graph");
     let mut graph = graph::build(&args, metadata)?;
     info!("Populating with debian data");
-    debian::populate(&mut graph)?;
+    debian::populate(&mut graph, args.quiet)?;
     info!("Printing graph");
     tree::print(&args, &graph)?;
 
