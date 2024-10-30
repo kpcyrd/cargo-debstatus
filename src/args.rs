@@ -10,7 +10,7 @@ pub enum Opts {
     Tree(Args),
 }
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct Args {
     #[clap(long = "package", short = 'p', value_name = "SPEC")]
     /// Package to be used as the root of the tree
@@ -30,6 +30,9 @@ pub struct Args {
     #[clap(long = "all-targets")]
     /// Return dependencies for all targets. By default only the host target is matched.
     pub all_targets: bool,
+    #[clap(long = "skip-cache")]
+    /// Do not read from disk cache for Debian database results
+    pub skip_cache: bool,
     #[clap(long = "no-dev-dependencies")]
     /// Skip dev dependencies.
     pub no_dev_dependencies: bool,
