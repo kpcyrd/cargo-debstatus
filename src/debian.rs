@@ -9,8 +9,6 @@ use semver::Version;
 use std::path::PathBuf;
 use std::thread;
 
-const QUERY_THREADS: usize = 24;
-
 #[derive(Debug, Clone)]
 pub struct Pkg {
     pub id: PackageId,
@@ -160,7 +158,7 @@ pub fn populate(graph: &mut Graph, args: &Args) -> Result<(), Error> {
     let (return_tx, return_rx) = crossbeam_channel::unbounded();
 
     info!("Creating thread-pool");
-    for _ in 0..QUERY_THREADS {
+    for _ in 0..args.concurrency {
         let args = args.clone();
         let task_rx = task_rx.clone();
         let return_tx = return_tx.clone();

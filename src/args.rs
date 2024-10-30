@@ -33,6 +33,9 @@ pub struct Args {
     #[clap(long = "skip-cache")]
     /// Do not read from disk cache for Debian database results
     pub skip_cache: bool,
+    #[clap(long = "concurrency", short = 'j', default_value = "24")]
+    /// How many database connections to use concurrently
+    pub concurrency: usize,
     #[clap(long = "no-dev-dependencies")]
     /// Skip dev dependencies.
     pub no_dev_dependencies: bool,
