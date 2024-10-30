@@ -280,11 +280,16 @@ fn print_dependencies<'a>(
 
     if let Prefix::Indent = prefix {
         if let Some(name) = name {
+            // start with padding used by packaging status icons
+            print!("    ");
+
+            // print tree graph parts
             for continues in &**levels_continue {
                 let c = if *continues { symbols.down } else { " " };
                 print!("{c}   ");
             }
 
+            // print the actual texts
             println!("{name}");
         }
     }
