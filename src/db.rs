@@ -102,7 +102,7 @@ impl Connection {
         if SystemTime::now().duration_since(cache.from)? > CACHE_EXPIRE {
             Ok(None)
         } else {
-            debug!("{package} {:?}", cache.info);
+            debug!("Found package in cache: {package} -> {:?}", cache.info);
             Ok(Some(cache.info))
         }
     }
@@ -123,9 +123,16 @@ impl Connection {
         Ok(())
     }
 
-    pub fn search(&mut self, package: &str, version: &Version) -> Result<PkgInfo, Error> {
-        if let Some(info) = self.check_cache("sid", package, version)? {
-            return Ok(info);
+    pub fn search(
+        &mut self,
+        package: &str,
+        version: &Version,
+        skip_cache: bool,
+    ) -> Result<PkgInfo, Error> {
+        if !skip_cache {
+            if let Some(info) = self.check_cache("sid", package, version)? {
+                return Ok(info);
+            }
         }
 
         // config.shell().status("Querying", format!("sid: {}", package))?;
@@ -140,9 +147,16 @@ impl Connection {
         Ok(info)
     }
 
-    pub fn search_new(&mut self, package: &str, version: &Version) -> Result<PkgInfo, Error> {
-        if let Some(info) = self.check_cache("new", package, version)? {
-            return Ok(info);
+    pub fn search_new(
+        &mut self,
+        package: &str,
+        version: &Version,
+        skip_cache: bool,
+    ) -> Result<PkgInfo, Error> {
+        if !skip_cache {
+            if let Some(info) = self.check_cache("new", package, version)? {
+                return Ok(info);
+            }
         }
 
         // config.shell().status("Querying", format!("new: {}", package))?;

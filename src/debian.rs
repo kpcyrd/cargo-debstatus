@@ -1,3 +1,4 @@
+use crate::args::Args;
 use crate::db::{Connection, PkgStatus};
 use crate::errors::*;
 use crate::graph::Graph;
@@ -7,8 +8,6 @@ use indicatif::ProgressStyle;
 use semver::Version;
 use std::path::PathBuf;
 use std::thread;
-
-const QUERY_THREADS: usize = 24;
 
 #[derive(Debug, Clone)]
 pub struct Pkg {
@@ -122,7 +121,7 @@ pub struct DebianInfo {
     pub version: String,
 }
 
-fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
+fn run_task(db: &mut Connection, pkg: Pkg, skip_cache: bool) -> Result<DebianInfo> {
     let mut deb = DebianInfo {
         in_unstable: false,
         in_new: false,
@@ -132,9 +131,9 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
         version: String::new(),
     };
 
-    let mut info = db.search(&pkg.name, &pkg.version).unwrap();
+    let mut info = db.search(&pkg.name, &pkg.version, skip_cache).unwrap();
     if info.status == PkgStatus::NotFound {
-        info = db.search_new(&pkg.name, &pkg.version).unwrap();
+        info = db.search_new(&pkg.name, &pkg.version, skip_cache).unwrap();
         if info.status != PkgStatus::NotFound {
             deb.in_new = true;
             deb.version = info.version;
@@ -154,12 +153,13 @@ fn run_task(db: &mut Connection, pkg: Pkg) -> Result<DebianInfo> {
     Ok(deb)
 }
 
-pub fn populate(graph: &mut Graph) -> Result<(), Error> {
+pub fn populate(graph: &mut Graph, args: &Args) -> Result<(), Error> {
     let (task_tx, task_rx) = crossbeam_channel::unbounded();
     let (return_tx, return_rx) = crossbeam_channel::unbounded();
 
     info!("Creating thread-pool");
-    for _ in 0..QUERY_THREADS {
+    for _ in 0..args.concurrency {
+        let args = args.clone();
         let task_rx = task_rx.clone();
         let return_tx = return_tx.clone();
 
@@ -173,7 +173,7 @@ pub fn populate(graph: &mut Graph) -> Result<(), Error> {
             };
 
             for (idx, pkg) in task_rx {
-                let deb = run_task(&mut db, pkg);
+                let deb = run_task(&mut db, pkg, args.skip_cache);
                 if return_tx.send(Ok((idx, deb))).is_err() {
                     break;
                 }
@@ -196,12 +196,16 @@ pub fn populate(graph: &mut Graph) -> Result<(), Error> {
 
     info!("Processing debian results");
 
-    let pb = ProgressBar::new(jobs as u64)
-        .with_style(
-            ProgressStyle::default_bar()
-                .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}")?,
-        )
-        .with_prefix("Resolving debian packages");
+    let pb = if args.quiet {
+        ProgressBar::hidden()
+    } else {
+        ProgressBar::new(jobs as u64)
+            .with_style(
+                ProgressStyle::default_bar()
+                    .template("[{pos:.green}/{len:.green}] {prefix:.bold} {wide_bar}")?,
+            )
+            .with_prefix("Resolving debian packages")
+    };
     pb.tick();
 
     for result in return_rx.iter().take(jobs) {
