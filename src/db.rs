@@ -29,7 +29,7 @@ pub struct CacheEntry {
     pub info: PkgInfo,
 }
 
-fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
+fn parse_deb_version(debversion: &str) -> Result<Version> {
     let mut debversion = debversion.replace('~', "-");
     if let Some((version, _suffix)) = debversion.split_once('+') {
         debversion = match version.matches('.').count() {
@@ -40,7 +40,11 @@ fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Er
         };
     }
     let debversion = Version::parse(&debversion)?;
+    Ok(debversion)
+}
 
+fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
+    let debversion = parse_deb_version(debversion)?;
     Ok(crateversion.matches(&debversion))
 }
 
@@ -205,6 +209,15 @@ impl Connection {
             } else if info.status == PkgStatus::NotFound {
                 info.version = debversion.to_string();
                 info.status = PkgStatus::Outdated;
+            } else if info.status == PkgStatus::Outdated {
+                if let (Ok(existing), Ok(ours)) = (
+                    parse_deb_version(&info.version),
+                    parse_deb_version(debversion),
+                ) {
+                    if existing < ours {
+                        info.version = debversion.to_string();
+                    }
+                }
             }
         }
 
