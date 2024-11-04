@@ -37,7 +37,7 @@ impl fmt::Display for PackagingProgress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let icon = match self {
             PackagingProgress::Available => "  ",
-            PackagingProgress::AvailableInNew => " N",
+            PackagingProgress::AvailableInNew => "✨",
             PackagingProgress::NeedsUpdate => "⌛",
             PackagingProgress::Missing => "🔴",
         };
