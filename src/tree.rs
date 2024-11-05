@@ -214,7 +214,7 @@ fn print_package<'a>(
     let pkg_status_s = format.display(package).to_string();
     println!("{}{}", treeline, pkg_status_s);
 
-    if !all && !package.show_dependencies() {
+    if !all && !package.show_dependencies() && !levels_continue.is_empty() {
         return;
     }
 
