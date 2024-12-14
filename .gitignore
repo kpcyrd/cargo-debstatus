@@ -2,3 +2,4 @@
 **/*.rs.bk
 *.kdev4
 .kdev4/
+.idea/
