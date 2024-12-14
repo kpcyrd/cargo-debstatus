@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-cargo_metadata = "0.18"
+cargo_metadata = "0.19"
 clap = { version = "4.5.16", features = ["derive"] }
 petgraph = "0.6"
 semver = "1"
