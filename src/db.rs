@@ -182,6 +182,7 @@ impl Connection {
             version: String::new(),
         };
         let package = package.replace('_', "-");
+        let package = package.to_lowercase();
         let semver_version = if version.major == 0 {
             if version.minor == 0 {
                 format!("{}.{}.{}", version.major, version.minor, version.patch)

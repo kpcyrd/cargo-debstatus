@@ -49,7 +49,7 @@ pub struct Display<'a> {
     package: &'a Pkg,
 }
 
-impl<'a> fmt::Display for Display<'a> {
+impl fmt::Display for Display<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         for chunk in &self.pattern.0 {
             match *chunk {
