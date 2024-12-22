@@ -1,6 +1,6 @@
 use crate::args::Args;
 use crate::debian::Pkg;
-use anyhow::{anyhow, Error};
+use crate::errors::*;
 use cargo_metadata::{DependencyKind, Metadata, PackageId};
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::StableGraph;

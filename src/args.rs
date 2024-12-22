@@ -54,6 +54,9 @@ pub struct Args {
     #[clap(long = "all", short = 'a')]
     /// Don't truncate dependencies that have already been displayed
     pub all: bool,
+    #[clap(long = "json")]
+    /// Print package information as machine-readable output
+    pub json: bool,
     #[clap(long = "duplicate", short = 'd')]
     /// Show only dependencies which come in multiple versions (implies -i)
     pub duplicates: bool,

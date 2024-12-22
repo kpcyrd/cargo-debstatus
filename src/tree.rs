@@ -2,9 +2,9 @@
 
 use crate::args::{Args, Charset};
 use crate::debian::Pkg;
-use crate::format::Pattern;
+use crate::errors::*;
+use crate::format::{self, Pattern};
 use crate::graph::Graph;
-use anyhow::{anyhow, Context, Error};
 use cargo_metadata::{DependencyKind, PackageId};
 use petgraph::visit::EdgeRef;
 use petgraph::EdgeDirection;
@@ -68,7 +68,9 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
             }
 
             let root = &graph.graph[graph.nodes[*package]];
-            print_tree(graph, root, &format, direction, symbols, prefix, args.all);
+            print_tree(
+                graph, root, &format, direction, symbols, prefix, args.all, args.json,
+            )?;
         }
     } else {
         let root = match &args.package {
@@ -79,7 +81,9 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
         };
         let root = &graph.graph[graph.nodes[root]];
 
-        print_tree(graph, root, &format, direction, symbols, prefix, args.all);
+        print_tree(
+            graph, root, &format, direction, symbols, prefix, args.all, args.json,
+        )?;
     }
 
     Ok(())
@@ -158,7 +162,8 @@ fn print_tree<'a>(
     symbols: &Symbols,
     prefix: Prefix,
     all: bool,
-) {
+    json: bool,
+) -> Result<(), Error> {
     let mut visited_deps = HashSet::new();
     let mut levels_continue = vec![];
 
@@ -170,9 +175,10 @@ fn print_tree<'a>(
         symbols,
         prefix,
         all,
+        json,
         &mut visited_deps,
         &mut levels_continue,
-    );
+    )
 }
 
 fn print_package<'a>(
@@ -183,9 +189,10 @@ fn print_package<'a>(
     symbols: &Symbols,
     prefix: Prefix,
     all: bool,
+    json: bool,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
-) {
+) -> Result<(), Error> {
     let treeline = {
         let mut line = "".to_string();
         line.push_str(&format!(" {} ", &package.packaging_status()));
@@ -211,11 +218,15 @@ fn print_package<'a>(
         line
     };
 
-    let pkg_status_s = format.display(package).to_string();
-    println!("{}{}", treeline, pkg_status_s);
+    if json {
+        println!("{}", format::json::display(package, levels_continue.len())?);
+    } else {
+        let pkg_status_s = format::human::display(format, package)?;
+        println!("{}{}", treeline, pkg_status_s);
+    }
 
     if !all && !package.show_dependencies() && !levels_continue.is_empty() {
-        return;
+        return Ok(());
     }
 
     for kind in &[
@@ -231,11 +242,14 @@ fn print_package<'a>(
             symbols,
             prefix,
             all,
+            json,
             visited_deps,
             levels_continue,
             *kind,
-        );
+        )?;
     }
+
+    Ok(())
 }
 
 fn print_dependencies<'a>(
@@ -246,10 +260,11 @@ fn print_dependencies<'a>(
     symbols: &Symbols,
     prefix: Prefix,
     all: bool,
+    json: bool,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     kind: DependencyKind,
-) {
+) -> Result<(), Error> {
     let idx = graph.nodes[&package.id];
     let mut deps = vec![];
     for edge in graph.graph.edges_directed(idx, direction) {
@@ -265,32 +280,34 @@ fn print_dependencies<'a>(
     }
 
     if deps.is_empty() {
-        return;
+        return Ok(());
     }
 
     // ensure a consistent output ordering
     deps.sort_by_key(|p| &p.id);
 
-    let name = match kind {
-        DependencyKind::Normal => None,
-        DependencyKind::Build => Some("[build-dependencies]"),
-        DependencyKind::Development => Some("[dev-dependencies]"),
-        _ => unreachable!(),
-    };
+    if !json {
+        let name = match kind {
+            DependencyKind::Normal => None,
+            DependencyKind::Build => Some("[build-dependencies]"),
+            DependencyKind::Development => Some("[dev-dependencies]"),
+            _ => unreachable!(),
+        };
 
-    if let Prefix::Indent = prefix {
-        if let Some(name) = name {
-            // start with padding used by packaging status icons
-            print!("    ");
+        if let Prefix::Indent = prefix {
+            if let Some(name) = name {
+                // start with padding used by packaging status icons
+                print!("    ");
 
-            // print tree graph parts
-            for continues in &**levels_continue {
-                let c = if *continues { symbols.down } else { " " };
-                print!("{c}   ");
+                // print tree graph parts
+                for continues in &**levels_continue {
+                    let c = if *continues { symbols.down } else { " " };
+                    print!("{c}   ");
+                }
+
+                // print the actual texts
+                println!("{name}");
             }
-
-            // print the actual texts
-            println!("{name}");
         }
     }
 
@@ -305,9 +322,12 @@ fn print_dependencies<'a>(
             symbols,
             prefix,
             all,
+            json,
             visited_deps,
             levels_continue,
-        );
+        )?;
         levels_continue.pop();
     }
+
+    Ok(())
 }
