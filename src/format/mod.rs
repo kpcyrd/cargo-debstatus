@@ -1,9 +1,9 @@
 use crate::debian::Pkg;
+use crate::errors::*;
 use crate::format::parse::{Parser, RawChunk};
-use anyhow::{anyhow, Error};
-use colored::Colorize;
-use std::fmt;
 
+pub mod human;
+pub mod json;
 mod parse;
 
 enum Chunk {
@@ -34,98 +34,5 @@ impl Pattern {
         }
 
         Ok(Pattern(chunks))
-    }
-
-    pub fn display<'a>(&'a self, package: &'a Pkg) -> Display<'a> {
-        Display {
-            pattern: self,
-            package,
-        }
-    }
-}
-
-pub struct Display<'a> {
-    pattern: &'a Pattern,
-    package: &'a Pkg,
-}
-
-impl fmt::Display for Display<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for chunk in &self.pattern.0 {
-            match *chunk {
-                Chunk::Raw(ref s) => fmt.write_str(s)?,
-                Chunk::Package => {
-                    let pkg = format!("{} v{}", self.package.name, self.package.version);
-                    if let Some(deb) = &self.package.debinfo {
-                        if deb.in_unstable {
-                            if deb.compatible {
-                                write!(
-                                    fmt,
-                                    "{} ({} in debian)",
-                                    pkg.green(),
-                                    deb.version.yellow()
-                                )?;
-                            } else if deb.outdated {
-                                write!(
-                                    fmt,
-                                    "{} (outdated, {} in debian)",
-                                    pkg.yellow(),
-                                    deb.version.red()
-                                )?;
-                            } else {
-                                write!(fmt, "{} (in debian)", pkg.green())?;
-                            }
-                        } else if deb.in_new {
-                            if deb.compatible {
-                                write!(
-                                    fmt,
-                                    "{} ({} in debian NEW queue)",
-                                    pkg.blue(),
-                                    deb.version.yellow()
-                                )?;
-                            } else if deb.outdated {
-                                write!(
-                                    fmt,
-                                    "{}, (outdated, {} in debian NEW queue)",
-                                    pkg.blue(),
-                                    deb.version.red()
-                                )?;
-                            } else {
-                                write!(fmt, "{} (in debian NEW queue)", pkg.blue())?;
-                            }
-                        } else if deb.outdated {
-                            write!(fmt, "{} (outdated, {})", pkg.red(), deb.version.red())?;
-                        } else {
-                            write!(fmt, "{pkg}")?;
-                        }
-                    } else {
-                        write!(fmt, "{pkg}")?;
-                    }
-
-                    match &self.package.source {
-                        Some(source) if !source.is_crates_io() => write!(fmt, " ({source})")?,
-                        // https://github.com/rust-lang/cargo/issues/7483
-                        None => write!(
-                            fmt,
-                            " ({})",
-                            self.package.manifest_path.parent().unwrap().display()
-                        )?,
-                        _ => {}
-                    }
-                }
-                Chunk::License => {
-                    if let Some(ref license) = self.package.license {
-                        write!(fmt, "{license}")?
-                    }
-                }
-                Chunk::Repository => {
-                    if let Some(ref repository) = self.package.repository {
-                        write!(fmt, "{repository}")?
-                    }
-                }
-            }
-        }
-
-        Ok(())
     }
 }
