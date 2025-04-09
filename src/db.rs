@@ -65,7 +65,6 @@ impl Client for LiveClient {
                 rows.iter()
                     .map(|row| {
                         (0..(row.len()))
-                            .into_iter()
                             .map(|i| row.get::<usize, String>(i))
                             .collect()
                     })
@@ -233,13 +232,12 @@ impl<C: Client> Connection<C> {
         let version = VersionReq::parse(&version)?;
         let semver_version = VersionReq::parse(&semver_version)?;
         for row in &rows {
-            let debversion: &str = row
-                .get(0)
+            let debversion: &str = row.first()
                 .expect("Each SQL result row should have one entry");
 
             let debversion = match debversion.find('-') {
                 Some(idx) => debversion.split_at(idx).0,
-                _ => &debversion,
+                _ => debversion,
             };
 
             //println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, &version));
