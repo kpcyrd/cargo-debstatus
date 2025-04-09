@@ -1,5 +1,5 @@
 use crate::args::Args;
-use crate::db::{Connection, PkgStatus};
+use crate::db::{Client, Connection, PkgStatus};
 use crate::errors::*;
 use crate::graph::Graph;
 use cargo_metadata::{Package, PackageId, Source};
@@ -121,7 +121,7 @@ pub struct DebianInfo {
     pub version: String,
 }
 
-fn run_task(db: &mut Connection, pkg: Pkg, skip_cache: bool) -> Result<DebianInfo> {
+fn run_task<C: Client>(db: &mut Connection<C>, pkg: Pkg, skip_cache: bool) -> Result<DebianInfo> {
     let mut deb = DebianInfo {
         in_unstable: false,
         in_new: false,
