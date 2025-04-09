@@ -1,5 +1,6 @@
 use crate::errors::*;
-use postgres::{Client, NoTls};
+use postgres::types::ToSql;
+use postgres::{Client as LiveClient, NoTls};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -48,18 +49,44 @@ fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Er
     Ok(crateversion.matches(&debversion))
 }
 
-pub struct Connection {
-    sock: Client,
+/// Trait which abstracts the SQL database for testing purposes
+pub trait Client {
+    /// Run a SQL query with parameters, returning a list of result rows
+    fn run_query(&mut self, query: &str, params: &[&str]) -> Result<Vec<Vec<String>>, Error>;
+}
+
+impl Client for LiveClient {
+    fn run_query(&mut self, query: &str, params: &[&str]) -> Result<Vec<Vec<String>>, Error> {
+        let cast: Vec<_> = params.iter().map(|s| s as &(dyn ToSql + Sync)).collect();
+        let res = self
+            .query(query, &cast)
+            .map_err(|err| err.into())
+            .map(|rows| {
+                rows.iter()
+                    .map(|row| {
+                        (0..(row.len()))
+                            .into_iter()
+                            .map(|i| row.get::<usize, String>(i))
+                            .collect()
+                    })
+                    .collect()
+            });
+        res
+    }
+}
+
+pub struct Connection<C: Client> {
+    sock: C,
     cache_dir: PathBuf,
 }
 
-impl Connection {
-    pub fn new() -> Result<Connection, Error> {
+impl Connection<LiveClient> {
+    pub fn new() -> Result<Self, Error> {
         // let tls = postgres::tls::native_tls::NativeTls::new()?;
         // let sock = postgres::Connection::connect(POSTGRES, TlsMode::Require(&tls))?;
         // TODO: udd-mirror doesn't support tls
         debug!("Connecting to database");
-        let sock = Client::connect(POSTGRES, NoTls)?;
+        let sock = LiveClient::connect(POSTGRES, NoTls)?;
         debug!("Got database connection");
 
         let cache_dir = dirs::cache_dir()
@@ -70,7 +97,9 @@ impl Connection {
 
         Ok(Connection { sock, cache_dir })
     }
+}
 
+impl<C: Client> Connection<C> {
     fn cache_path(&self, target: &str, package: &str, version: &Version) -> PathBuf {
         self.cache_dir
             .join(format!("{target}-{package}-{}", version))
@@ -192,7 +221,7 @@ impl Connection {
         } else {
             format!("{}", version.major)
         };
-        let rows = self.sock.query(
+        let rows = self.sock.run_query(
             query,
             &[
                 &format!("rust-{package}"),
@@ -204,7 +233,9 @@ impl Connection {
         let version = VersionReq::parse(&version)?;
         let semver_version = VersionReq::parse(&semver_version)?;
         for row in &rows {
-            let debversion: String = row.get(0);
+            let debversion: &str = row
+                .get(0)
+                .expect("Each SQL result row should have one entry");
 
             let debversion = match debversion.find('-') {
                 Some(idx) => debversion.split_at(idx).0,
@@ -243,8 +274,63 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::db::{is_compatible, Connection, PkgStatus};
+    use anyhow::anyhow;
     use semver::{Version, VersionReq};
+
+    use super::Client;
+
+    struct MockClient<'a> {
+        responses: HashMap<Vec<&'a str>, Vec<Vec<&'a str>>>,
+    }
+
+    impl<'a> Client for MockClient<'a> {
+        fn run_query(
+            &mut self,
+            query: &str,
+            params: &[&str],
+        ) -> anyhow::Result<Vec<Vec<String>>, anyhow::Error> {
+            let mut key = vec![query];
+            key.extend_from_slice(params);
+            self.responses
+                .get(&key)
+                .map(|v| {
+                    v.iter()
+                        .map(|row| row.iter().map(|s| s.to_string()).collect())
+                        .collect()
+                })
+                .ok_or(anyhow!(
+                    "Unmocked SQL query: {query}, with parameters: [{}]",
+                    params.join(", ")
+                ))
+        }
+    }
+
+    fn mock_connection<'a>(
+        mocked_responses: &'a [(&str, Vec<&str>, Vec<Vec<&str>>)],
+    ) -> Connection<MockClient<'a>> {
+        let responses = mocked_responses
+            .into_iter()
+            .map(|(query, params, rows)| {
+                let mut key = vec![*query];
+                for param in params.iter() {
+                    key.push(param);
+                }
+                let value = rows.iter().map(|arr| arr.to_vec()).collect();
+                (key, value)
+            })
+            .collect();
+        let mock_client = MockClient { responses };
+        let cache_dir =
+            tempfile::tempdir().expect("could not create a temporary directory for the cache");
+
+        Connection {
+            sock: mock_client,
+            cache_dir: cache_dir.into_path(),
+        }
+    }
 
     #[test]
     fn is_compatible_with_tilde() {
@@ -268,12 +354,24 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn check_version_reqs() {
-        let mut db = Connection::new().unwrap();
         // Debian bullseye has rust-serde v1.0.106 and shouldn't be updated anymore
         let query =
             "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='bullseye';";
+        let mocked_responses = &[
+            (
+                query,
+                vec!["rust-serde", "rust-serde-1"],
+                vec![vec!["1.0.106-1"]],
+            ),
+            (
+                query,
+                vec!["rust-serde", "rust-serde-2"],
+                vec![vec!["1.0.106-1"]],
+            ),
+            (query, vec!["rust-notacrate", "rust-notacrate-1"], vec![]),
+        ][..];
+        let mut db = mock_connection(mocked_responses);
         let info = db
             .search_generic(query, "serde", &Version::parse("1.0.100").unwrap())
             .unwrap();
@@ -294,12 +392,23 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn check_zerover_version_reqs() {
-        let mut db = Connection::new().unwrap();
         // Debian bookworm has rust-zoxide v0.4.3 and shouldn't be updated anymore
         let query =
             "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='bookworm';";
+        let mocked_responses = &[
+            (
+                query,
+                vec!["rust-zoxide", "rust-zoxide-0.4"],
+                vec![vec!["0.4.3-5"]],
+            ),
+            (
+                query,
+                vec!["rust-zoxide", "rust-zoxide-0.5"],
+                vec![vec!["0.4.3-5"]],
+            ),
+        ][..];
+        let mut db = mock_connection(mocked_responses);
         let info = db
             .search_generic(query, "zoxide", &Version::parse("0.4.1").unwrap())
             .unwrap();
