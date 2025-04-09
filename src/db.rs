@@ -65,7 +65,6 @@ impl Client for LiveClient {
                 rows.iter()
                     .map(|row| {
                         (0..(row.len()))
-                            .into_iter()
                             .map(|i| row.get::<usize, String>(i))
                             .collect()
                     })
@@ -234,12 +233,12 @@ impl<C: Client> Connection<C> {
         let semver_version = VersionReq::parse(&semver_version)?;
         for row in &rows {
             let debversion: &str = row
-                .get(0)
+                .first()
                 .expect("Each SQL result row should have one entry");
 
             let debversion = match debversion.find('-') {
                 Some(idx) => debversion.split_at(idx).0,
-                _ => &debversion,
+                _ => debversion,
             };
 
             //println!("{:?} ({:?}) => {:?}", debversion, version, is_compatible(debversion, &version));
@@ -282,11 +281,16 @@ mod tests {
 
     use super::Client;
 
+    /// SQL queries followed by their parameters
+    type MockedQuery<'a> = Vec<&'a str>;
+    /// Mocked SQL query results
+    type ResultRows<'a> = Vec<Vec<&'a str>>;
+
     struct MockClient<'a> {
-        responses: HashMap<Vec<&'a str>, Vec<Vec<&'a str>>>,
+        responses: HashMap<MockedQuery<'a>, ResultRows<'a>>,
     }
 
-    impl<'a> Client for MockClient<'a> {
+    impl Client for MockClient<'_> {
         fn run_query(
             &mut self,
             query: &str,
@@ -309,10 +313,10 @@ mod tests {
     }
 
     fn mock_connection<'a>(
-        mocked_responses: &'a [(&str, Vec<&str>, Vec<Vec<&str>>)],
+        mocked_responses: &'a [(&str, Vec<&str>, ResultRows<'a>)],
     ) -> Connection<MockClient<'a>> {
         let responses = mocked_responses
-            .into_iter()
+            .iter()
             .map(|(query, params, rows)| {
                 let mut key = vec![*query];
                 for param in params.iter() {
