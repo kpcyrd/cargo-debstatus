@@ -58,20 +58,16 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
         }
     }
 
-    // optionally prune roots reachable from other roots (directionally),
-    // that is, do not count as roots workspace members which are dependencies
-    // of other workspace members
+    // optionally collapse workspace
     if args.collapse_workspace {
-        let mut droots = HashSet::new();
-        for root in &graph.roots {
-            let mut dfs = Dfs::new(&graph.graph, graph.nodes[root]);
-            while dfs.next(&graph.graph).is_some() {}
-            droots.extend(graph.roots.iter().filter(|&droot| {
-                droot != root && dfs.discovered.contains(graph.nodes[droot].index())
-            }));
-        }
-        let disc: Vec<PackageId> = droots.iter().map(|&package| package.clone()).collect();
-        graph.roots.retain(|root| !disc.contains(root));
+        collapse_workspace(&mut graph);
+    }
+
+    // prune roots excluded on the command line
+    if let Some(excluded) = &args.excluded {
+        let excluded: Vec<&str> = excluded.split(",").collect();
+        let excluded_roots: Vec<PackageId> = resolve_roots(&graph, &excluded);
+        graph.roots.retain(|root| !excluded_roots.contains(root));
     }
 
     // prune nodes not reachable from the root packages (directionally)
@@ -92,4 +88,40 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
     });
 
     Ok(graph)
+}
+
+// prune roots reachable from other roots (directionally), that is,
+// do not count as roots workspace members which are dependencies
+// of other workspace members
+fn collapse_workspace(graph: &mut Graph) {
+    let mut droots = HashSet::new();
+    for root in &graph.roots {
+        let mut dfs = Dfs::new(&graph.graph, graph.nodes[root]);
+        while dfs.next(&graph.graph).is_some() {}
+        droots.extend(
+            graph.roots.iter().filter(|&droot| {
+                droot != root && dfs.discovered.contains(graph.nodes[droot].index())
+            }),
+        );
+    }
+    let disc: Vec<PackageId> = droots.iter().map(|&package| package.clone()).collect();
+    graph.roots.retain(|root| !disc.contains(root));
+}
+
+fn resolve_roots(graph: &Graph, roots: &[&str]) -> Vec<PackageId> {
+    graph
+        .roots
+        .iter()
+        .filter(|root| {
+            roots.contains(
+                &graph
+                    .graph
+                    .node_weight(graph.nodes[root])
+                    .unwrap()
+                    .name
+                    .as_str(),
+            )
+        })
+        .cloned()
+        .collect()
 }

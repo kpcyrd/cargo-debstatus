@@ -15,6 +15,9 @@ pub struct Args {
     #[clap(long = "package", short = 'p', value_name = "SPEC")]
     /// Package to be used as the root of the tree
     pub package: Option<String>,
+    #[clap(long = "exclude", value_name = "PACKAGES")]
+    /// Comma-separated list of workspace members to exclude from output
+    pub excluded: Option<String>,
     #[clap(long = "features", value_name = "FEATURES")]
     /// Space-separated list of features to activate
     pub features: Option<String>,
