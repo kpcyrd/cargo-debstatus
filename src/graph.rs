@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub struct Graph {
     pub graph: StableGraph<Pkg, DependencyKind>,
     pub nodes: HashMap<PackageId, NodeIndex>,
-    pub root: Option<PackageId>,
+    pub roots: Vec<PackageId>,
 }
 
 pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
@@ -19,7 +19,7 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
     let mut graph = Graph {
         graph: StableGraph::new(),
         nodes: HashMap::new(),
-        root: resolve.root,
+        roots: metadata.workspace_members,
     };
 
     for package in metadata.packages {
@@ -58,21 +58,22 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
         }
     }
 
-    // prune nodes not reachable from the root package (directionally)
-    if let Some(root) = &graph.root {
-        let mut dfs = Dfs::new(&graph.graph, graph.nodes[root]);
+    // prune nodes not reachable from the root packages (directionally)
+    let mut dfs = Dfs::empty(&graph.graph);
+    graph.roots.iter().for_each(|root| {
+        dfs.move_to(graph.nodes[root]);
         while dfs.next(&graph.graph).is_some() {}
+    });
 
-        let g = &mut graph.graph;
-        graph.nodes.retain(|_, idx| {
-            if !dfs.discovered.contains(idx.index()) {
-                g.remove_node(*idx);
-                false
-            } else {
-                true
-            }
-        });
-    }
+    let g = &mut graph.graph;
+    graph.nodes.retain(|_, idx| {
+        if !dfs.discovered.contains(idx.index()) {
+            g.remove_node(*idx);
+            false
+        } else {
+            true
+        }
+    });
 
     Ok(graph)
 }
