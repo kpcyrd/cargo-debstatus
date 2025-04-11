@@ -73,23 +73,20 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
             )?;
         }
     } else {
-        let root = match &args.package {
-            Some(package) => find_package(package, graph)?,
-            None => {
-                if graph.roots.len() == 1 {
-                    &graph.roots[0]
-                } else {
-                    return Err(anyhow!(
-                        "this command requires running against an actual package in this workspace"
-                    ));
-                }
-            }
+        let roots = match &args.package {
+            Some(package) => vec![find_package(package, graph)?],
+            None => graph.roots.iter().collect(),
         };
-        let root = &graph.graph[graph.nodes[root]];
+        for (i, root) in roots.into_iter().enumerate() {
+            if i != 0 {
+                println!();
+            }
 
-        print_tree(
-            graph, root, &format, direction, symbols, prefix, args.all, args.json,
-        )?;
+            let root = &graph.graph[graph.nodes[root]];
+            print_tree(
+                graph, root, &format, direction, symbols, prefix, args.all, args.json,
+            )?;
+        }
     }
 
     Ok(())
