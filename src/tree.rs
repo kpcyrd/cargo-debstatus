@@ -76,9 +76,15 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
     } else {
         let root = match &args.package {
             Some(package) => find_package(package, graph)?,
-            None => graph.root.as_ref().ok_or_else(|| {
-                anyhow!("this command requires running against an actual package in this workspace")
-            })?,
+            None => {
+                if graph.roots.len() == 1 {
+                    &graph.roots[0]
+                } else {
+                    return Err(anyhow!(
+                        "this command requires running against an actual package in this workspace"
+                    ));
+                }
+            }
         };
         let root = &graph.graph[graph.nodes[root]];
 
