@@ -42,6 +42,9 @@ pub struct Args {
     #[clap(long = "manifest-path", value_name = "PATH")]
     /// Path to Cargo.toml
     pub manifest_path: Option<PathBuf>,
+    #[clap(long = "collapse-workspace", short = 'w')]
+    /// Hide the dependency trees of workspace members which are dependencies of other members
+    pub collapse_workspace: bool,
     #[clap(long = "invert", short = 'i')]
     /// Invert the tree direction
     pub invert: bool,

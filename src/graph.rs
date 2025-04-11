@@ -5,7 +5,7 @@ use cargo_metadata::{DependencyKind, Metadata, PackageId};
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::StableGraph;
 use petgraph::visit::Dfs;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct Graph {
     pub graph: StableGraph<Pkg, DependencyKind>,
@@ -56,6 +56,22 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
                 graph.graph.add_edge(from, to, kind);
             }
         }
+    }
+
+    // optionally prune roots reachable from other roots (directionally),
+    // that is, do not count as roots workspace members which are dependencies
+    // of other workspace members
+    if args.collapse_workspace {
+        let mut droots = HashSet::new();
+        for root in &graph.roots {
+            let mut dfs = Dfs::new(&graph.graph, graph.nodes[root]);
+            while dfs.next(&graph.graph).is_some() {}
+            droots.extend(graph.roots.iter().filter(|&droot| {
+                droot != root && dfs.discovered.contains(graph.nodes[droot].index())
+            }));
+        }
+        let disc: Vec<PackageId> = droots.iter().map(|&package| package.clone()).collect();
+        graph.roots.retain(|root| !disc.contains(root));
     }
 
     // prune nodes not reachable from the root packages (directionally)
