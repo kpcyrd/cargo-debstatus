@@ -58,16 +58,28 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
         }
     }
 
-    // optionally collapse workspace
-    if args.collapse_workspace {
-        collapse_workspace(&mut graph);
-    }
+    if let Some(included) = &args.included {
+        // only keep roots included on the command line
+        let included: Vec<&str> = included.split(",").collect();
+        let included_roots: Vec<PackageId> = resolve_roots(&graph, &included);
+        graph.roots.retain(|root| included_roots.contains(root));
 
-    // prune roots excluded on the command line
-    if let Some(excluded) = &args.excluded {
-        let excluded: Vec<&str> = excluded.split(",").collect();
-        let excluded_roots: Vec<PackageId> = resolve_roots(&graph, &excluded);
-        graph.roots.retain(|root| !excluded_roots.contains(root));
+        // optionally collapse workspace
+        if args.collapse_workspace {
+            collapse_workspace(&mut graph);
+        }
+    } else {
+        // optionally collapse workspace
+        if args.collapse_workspace {
+            collapse_workspace(&mut graph);
+        }
+
+        // prune roots excluded on the command line
+        if let Some(excluded) = &args.excluded {
+            let excluded: Vec<&str> = excluded.split(",").collect();
+            let excluded_roots: Vec<PackageId> = resolve_roots(&graph, &excluded);
+            graph.roots.retain(|root| !excluded_roots.contains(root));
+        }
     }
 
     // prune nodes not reachable from the root packages (directionally)
