@@ -28,6 +28,7 @@ pub enum PackagingProgress {
     AvailableInNew,
     NeedsUpdate,
     Missing,
+    MissingInWorkspace,
 }
 
 use std::fmt;
@@ -41,6 +42,7 @@ impl fmt::Display for PackagingProgress {
             PackagingProgress::AvailableInNew => "✨",
             PackagingProgress::NeedsUpdate => "⌛",
             PackagingProgress::Missing => "🔴",
+            PackagingProgress::MissingInWorkspace => "🪏 ",
         };
         write!(f, "{}", icon)
     }
@@ -104,9 +106,13 @@ impl Pkg {
                 }
             } else if deb.outdated {
                 PackagingProgress::NeedsUpdate
+            } else if self.workspace_member {
+                PackagingProgress::MissingInWorkspace
             } else {
                 PackagingProgress::Missing
             }
+        } else if self.workspace_member {
+            PackagingProgress::MissingInWorkspace
         } else {
             PackagingProgress::Missing
         }
