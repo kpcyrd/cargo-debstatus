@@ -19,12 +19,13 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
     let mut graph = Graph {
         graph: StableGraph::new(),
         nodes: HashMap::new(),
-        roots: metadata.workspace_members,
+        roots: metadata.workspace_members.clone(),
     };
 
     for package in metadata.packages {
         let id = package.id.clone();
-        let index = graph.graph.add_node(Pkg::new(package));
+        let workspace_member = metadata.workspace_members.contains(&package.id);
+        let index = graph.graph.add_node(Pkg::new(package, workspace_member));
         graph.nodes.insert(id, index);
     }
 

@@ -15,6 +15,7 @@ pub struct Pkg {
     pub id: PackageId,
     pub name: String,
     pub version: Version,
+    pub workspace_member: bool,
     pub source: Option<Source>,
     pub manifest_path: PathBuf,
     pub license: Option<String>,
@@ -51,11 +52,12 @@ impl fmt::Display for PackagingProgress {
 }
 
 impl Pkg {
-    pub fn new(pkg: Package) -> Pkg {
+    pub fn new(pkg: Package, workspace_member: bool) -> Pkg {
         Pkg {
             id: pkg.id,
             name: pkg.name,
             version: pkg.version,
+            workspace_member,
             source: pkg.source,
             manifest_path: pkg.manifest_path.into(),
             license: pkg.license,
