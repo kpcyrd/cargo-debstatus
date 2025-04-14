@@ -32,6 +32,7 @@ pub enum PackagingProgress {
     /// debian has a newer version of this dependency, so we need to patch its dependent
     NeedsPatching,
     Missing,
+    MissingInWorkspace,
 }
 
 use std::fmt;
@@ -46,6 +47,7 @@ impl fmt::Display for PackagingProgress {
             PackagingProgress::NeedsUpdate => "⌛",
             PackagingProgress::NeedsPatching => "🔽",
             PackagingProgress::Missing => "🔴",
+            PackagingProgress::MissingInWorkspace => "🪏 ",
         };
         write!(f, "{}", icon)
     }
@@ -115,9 +117,13 @@ impl Pkg {
                 PackagingProgress::NeedsUpdate
             } else if deb.newer {
                 PackagingProgress::NeedsPatching
+            } else if self.workspace_member {
+                PackagingProgress::MissingInWorkspace
             } else {
                 PackagingProgress::Missing
             }
+        } else if self.workspace_member {
+            PackagingProgress::MissingInWorkspace
         } else {
             PackagingProgress::Missing
         }

@@ -64,7 +64,12 @@ pub fn display(pattern: &Pattern, package: &Pkg) -> Result<String, Error> {
                     // https://github.com/rust-lang/cargo/issues/7483
                     None => write!(
                         fmt,
-                        " ({})",
+                        " ({}{})",
+                        if package.workspace_member {
+                            "in workspace, "
+                        } else {
+                            ""
+                        },
                         package.manifest_path.parent().unwrap().display()
                     )?,
                     _ => {}
