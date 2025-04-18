@@ -43,7 +43,15 @@ Packages currently in the NEW queue will show up in turquoise.
 .SH OPTIONS
 .TP
 \f[B]-p\f[R], \f[B]--package\f[R] <SPEC>
-Package to be used as the root of the tree
+Package to be used as the root of the tree.
+Has precedence over --include, --exclude and --collapse-workspace
+.TP
+\f[B]--include\f[R] <PACKAGES>
+Comma-separated list of workspace members to include in output.
+Has precedence over --exclude
+.TP
+\f[B]--exclude\f[R] <PACKAGES>
+Comma-separated list of workspace members to exclude from output
 .TP
 \f[B]--features\f[R] <FEATURES>
 Space-separated list of features to activate
@@ -66,6 +74,10 @@ Skip dev dependencies
 .TP
 \f[B]--manifest-path\f[R] <PATH>
 Path to Cargo.toml
+.TP
+\f[B]-w\f[R], \f[B]--collapse-workspace\f[R]
+Hide the dependency trees of workspace members which are dependencies
+of other members
 .TP
 \f[B]-i\f[R], \f[B]--invert\f[R]
 Invert the tree direction
