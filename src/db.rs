@@ -30,6 +30,12 @@ pub struct CacheEntry {
     pub info: PkgInfo,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum PkgType {
+    Source,
+    Binary,
+}
+
 fn parse_deb_version(debversion: &str) -> Result<Version> {
     let mut debversion = debversion.replace('~', "-");
     if let Some((version, _suffix)) = debversion.split_once('+') {
@@ -169,7 +175,7 @@ impl<C: Client> Connection<C> {
             "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
             package,
             version,
-            true,
+            PkgType::Binary,
         )?;
         if info.status == PkgStatus::NotFound {
             info!("Querying -> sid (source): {}", package);
@@ -177,7 +183,7 @@ impl<C: Client> Connection<C> {
                 "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
                 package,
                 version,
-                false,
+                PkgType::Source,
             )?;
         }
 
@@ -203,7 +209,7 @@ impl<C: Client> Connection<C> {
             "SELECT version::text FROM new_sources WHERE source in ($1, $2);",
             package,
             version,
-            false,
+            PkgType::Source,
         )?;
 
         self.write_cache("new", package, version, &info)?;
@@ -215,7 +221,7 @@ impl<C: Client> Connection<C> {
         query: &str,
         package: &str,
         version: &Version,
-        binary: bool,
+        pkg_type: PkgType,
     ) -> Result<PkgInfo, Error> {
         let mut info = PkgInfo {
             status: PkgStatus::NotFound,
@@ -232,7 +238,7 @@ impl<C: Client> Connection<C> {
         } else {
             format!("{}", version.major)
         };
-        let names: &[&str] = if binary {
+        let names: &[&str] = if pkg_type == PkgType::Binary {
             &[
                 &format!("librust-{package}-dev")[..],
                 &format!("librust-{package}-{}-dev", semver_version),
@@ -292,7 +298,7 @@ impl<C: Client> Connection<C> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::db::{is_compatible, Connection, PkgStatus};
+    use crate::db::{is_compatible, Connection, PkgStatus, PkgType};
     use anyhow::anyhow;
     use semver::{Version, VersionReq};
 
@@ -440,20 +446,40 @@ mod tests {
         ][..];
         let mut db = mock_connection(mocked_responses);
         let info = db
-            .search_generic(query, "serde", &Version::parse("1.0.100").unwrap(), false)
+            .search_generic(
+                query,
+                "serde",
+                &Version::parse("1.0.100").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Found);
         assert_eq!(info.version, "1.0.106");
         let info = db
-            .search_generic(query, "serde", &Version::parse("1.0.150").unwrap(), false)
+            .search_generic(
+                query,
+                "serde",
+                &Version::parse("1.0.150").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Compatible);
         let info = db
-            .search_generic(query, "serde", &Version::parse("2.0.0").unwrap(), false)
+            .search_generic(
+                query,
+                "serde",
+                &Version::parse("2.0.0").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Outdated);
         let info = db
-            .search_generic(query, "notacrate", &Version::parse("1.0.0").unwrap(), false)
+            .search_generic(
+                query,
+                "notacrate",
+                &Version::parse("1.0.0").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::NotFound);
     }
@@ -477,16 +503,31 @@ mod tests {
         ][..];
         let mut db = mock_connection(mocked_responses);
         let info = db
-            .search_generic(query, "zoxide", &Version::parse("0.4.1").unwrap(), false)
+            .search_generic(
+                query,
+                "zoxide",
+                &Version::parse("0.4.1").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Found);
         assert_eq!(info.version, "0.4.3");
         let info = db
-            .search_generic(query, "zoxide", &Version::parse("0.4.5").unwrap(), false)
+            .search_generic(
+                query,
+                "zoxide",
+                &Version::parse("0.4.5").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Compatible);
         let info = db
-            .search_generic(query, "zoxide", &Version::parse("0.5.0").unwrap(), false)
+            .search_generic(
+                query,
+                "zoxide",
+                &Version::parse("0.5.0").unwrap(),
+                PkgType::Source,
+            )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Outdated);
     }
