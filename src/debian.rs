@@ -14,6 +14,7 @@ pub struct Pkg {
     pub id: PackageId,
     pub name: String,
     pub version: Version,
+    pub workspace_member: bool,
     pub source: Option<Source>,
     pub manifest_path: PathBuf,
     pub license: Option<String>,
@@ -27,6 +28,7 @@ pub enum PackagingProgress {
     AvailableInNew,
     NeedsUpdate,
     Missing,
+    MissingInWorkspace,
 }
 
 use std::fmt;
@@ -40,17 +42,19 @@ impl fmt::Display for PackagingProgress {
             PackagingProgress::AvailableInNew => "✨",
             PackagingProgress::NeedsUpdate => "⌛",
             PackagingProgress::Missing => "🔴",
+            PackagingProgress::MissingInWorkspace => "🪏 ",
         };
         write!(f, "{}", icon)
     }
 }
 
 impl Pkg {
-    pub fn new(pkg: Package) -> Pkg {
+    pub fn new(pkg: Package, workspace_member: bool) -> Pkg {
         Pkg {
             id: pkg.id,
             name: pkg.name,
             version: pkg.version,
+            workspace_member,
             source: pkg.source,
             manifest_path: pkg.manifest_path.into(),
             license: pkg.license,
@@ -102,9 +106,13 @@ impl Pkg {
                 }
             } else if deb.outdated {
                 PackagingProgress::NeedsUpdate
+            } else if self.workspace_member {
+                PackagingProgress::MissingInWorkspace
             } else {
                 PackagingProgress::Missing
             }
+        } else if self.workspace_member {
+            PackagingProgress::MissingInWorkspace
         } else {
             PackagingProgress::Missing
         }
