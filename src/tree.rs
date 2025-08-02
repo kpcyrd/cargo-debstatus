@@ -225,7 +225,9 @@ fn print_package<'a>(
         println!("{}{}", treeline, pkg_status_s);
     }
 
-    if !all && !package.show_dependencies() && !levels_continue.is_empty() {
+    if (!all && !package.show_dependencies() && !levels_continue.is_empty())
+        || !visited_deps.insert(&package.id)
+    {
         return Ok(());
     }
 
