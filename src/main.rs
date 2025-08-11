@@ -1,6 +1,7 @@
 use crate::args::Opts;
 use crate::errors::*;
 use clap::Parser;
+use std::io;
 
 mod args;
 mod db;
@@ -22,7 +23,7 @@ fn main() -> Result<(), Error> {
     info!("Populating with debian data");
     debian::populate(&mut graph, &args)?;
     info!("Printing graph");
-    tree::print(&args, &graph)?;
+    tree::print(&args, &graph, &mut io::stdout())?;
 
     Ok(())
 }
