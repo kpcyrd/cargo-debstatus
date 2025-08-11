@@ -342,3 +342,33 @@ fn print_dependencies<'a, W: Write>(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+
+    use anyhow::Error;
+    use cargo_metadata::Metadata;
+    use clap::Parser;
+
+    use super::print;
+    use crate::{args::Args, graph};
+
+    #[test]
+    fn print_tree_without_dependency_loop() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_without_loop.json"
+        ))?;
+        let graph = graph::build(&args, metadata)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let expected = r#" 🔴 cargotest v0.1.0 (/tmp/cargotest)
+ 🔴 └── crossbeam-channel v0.5.15
+ 🔴     └── crossbeam-utils v0.8.21
+"#;
+        assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
+}
