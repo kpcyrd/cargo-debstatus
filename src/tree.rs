@@ -10,6 +10,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::EdgeDirection;
 use semver::Version;
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 
 #[derive(Clone, Copy)]
 enum Prefix {
@@ -39,7 +40,7 @@ static ASCII_SYMBOLS: Symbols = Symbols {
     right: "-",
 };
 
-pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
+pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(), Error> {
     let format = Pattern::new(&args.format)?;
 
     let direction = if args.invert || args.duplicates {
@@ -64,12 +65,12 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
     if args.duplicates {
         for (i, package) in find_duplicates(graph).iter().enumerate() {
             if i != 0 {
-                println!();
+                writeln!(writer)?;
             }
 
             let root = &graph.graph[graph.nodes[*package]];
             print_tree(
-                graph, root, &format, direction, symbols, prefix, args.all, args.json,
+                graph, root, &format, direction, symbols, prefix, args.all, args.json, writer,
             )?;
         }
     } else {
@@ -82,7 +83,7 @@ pub fn print(args: &Args, graph: &Graph) -> Result<(), Error> {
         let root = &graph.graph[graph.nodes[root]];
 
         print_tree(
-            graph, root, &format, direction, symbols, prefix, args.all, args.json,
+            graph, root, &format, direction, symbols, prefix, args.all, args.json, writer,
         )?;
     }
 
@@ -154,7 +155,7 @@ fn find_duplicates(graph: &Graph) -> Vec<&PackageId> {
     duplicates
 }
 
-fn print_tree<'a>(
+fn print_tree<'a, W: Write>(
     graph: &'a Graph,
     root: &'a Pkg,
     format: &Pattern,
@@ -163,6 +164,7 @@ fn print_tree<'a>(
     prefix: Prefix,
     all: bool,
     json: bool,
+    writer: &mut W,
 ) -> Result<(), Error> {
     let mut visited_deps = HashSet::new();
     let mut levels_continue = vec![];
@@ -178,10 +180,11 @@ fn print_tree<'a>(
         json,
         &mut visited_deps,
         &mut levels_continue,
+        writer,
     )
 }
 
-fn print_package<'a>(
+fn print_package<'a, W: Write>(
     graph: &'a Graph,
     package: &'a Pkg,
     format: &Pattern,
@@ -192,6 +195,7 @@ fn print_package<'a>(
     json: bool,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
+    writer: &mut W,
 ) -> Result<(), Error> {
     let treeline = {
         let mut line = "".to_string();
@@ -219,13 +223,19 @@ fn print_package<'a>(
     };
 
     if json {
-        println!("{}", format::json::display(package, levels_continue.len())?);
+        writeln!(
+            writer,
+            "{}",
+            format::json::display(package, levels_continue.len())?
+        )?;
     } else {
         let pkg_status_s = format::human::display(format, package)?;
-        println!("{}{}", treeline, pkg_status_s);
+        writeln!(writer, "{treeline}{pkg_status_s}")?;
     }
 
-    if !all && !package.show_dependencies() && !levels_continue.is_empty() {
+    if !all && !package.show_dependencies() && !levels_continue.is_empty()
+        || !visited_deps.insert(&package.id)
+    {
         return Ok(());
     }
 
@@ -246,13 +256,14 @@ fn print_package<'a>(
             visited_deps,
             levels_continue,
             *kind,
+            writer,
         )?;
     }
 
     Ok(())
 }
 
-fn print_dependencies<'a>(
+fn print_dependencies<'a, W: Write>(
     graph: &'a Graph,
     package: &'a Pkg,
     format: &Pattern,
@@ -264,6 +275,7 @@ fn print_dependencies<'a>(
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     kind: DependencyKind,
+    writer: &mut W,
 ) -> Result<(), Error> {
     let idx = graph.nodes[&package.id];
     let mut deps = vec![];
@@ -297,16 +309,16 @@ fn print_dependencies<'a>(
         if let Prefix::Indent = prefix {
             if let Some(name) = name {
                 // start with padding used by packaging status icons
-                print!("    ");
+                write!(writer, "    ")?;
 
                 // print tree graph parts
                 for continues in &**levels_continue {
                     let c = if *continues { symbols.down } else { " " };
-                    print!("{c}   ");
+                    write!(writer, "{c}   ")?;
                 }
 
                 // print the actual texts
-                println!("{name}");
+                writeln!(writer, "{name}")?;
             }
         }
     }
@@ -325,9 +337,59 @@ fn print_dependencies<'a>(
             json,
             visited_deps,
             levels_continue,
+            writer,
         )?;
         levels_continue.pop();
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use anyhow::Error;
+    use cargo_metadata::Metadata;
+    use clap::Parser;
+
+    use super::print;
+    use crate::{args::Args, graph};
+
+    #[test]
+    fn print_tree_without_dependency_loop() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_without_loop.json"
+        ))?;
+        let graph = graph::build(&args, metadata)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let expected = r#" 🔴 cargotest v0.1.0 (/tmp/cargotest)
+ 🔴 └── crossbeam-channel v0.5.15
+ 🔴     └── crossbeam-utils v0.8.21
+"#;
+        assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn print_tree_with_dependency_loop() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus"]);
+        let metadata: Metadata =
+            serde_json::from_str(include_str!("../tests/data/cargo_metadata_with_loop.json"))?;
+        let graph = graph::build(&args, metadata)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let expected = r#" 🔴 cargotest v0.1.0 (/tmp/cargotest)
+ 🔴 └── crossbeam-channel v0.5.15
+ 🔴     └── crossbeam-utils v0.8.21
+ 🔴         └── crossbeam-channel v0.5.15
+"#;
+        assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
 }
