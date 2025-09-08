@@ -335,7 +335,7 @@ fn print_dependencies<'a, W: Write>(
             prefix,
             all,
             json,
-            visited_deps,
+            &mut visited_deps.clone(),
             levels_continue,
             writer,
         )?;
@@ -388,6 +388,29 @@ mod tests {
  🔴 └── crossbeam-channel v0.5.15
  🔴     └── crossbeam-utils v0.8.21
  🔴         └── crossbeam-channel v0.5.15
+"#;
+        assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn print_tree_with_common_dependency() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_with_common_dependency.json"
+        ))?;
+        let graph = graph::build(&args, metadata)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let expected = r#" 🔴 cargo-test v0.1.0 (/private/tmp/cargo-test)
+ 🔴 ├── a v0.1.0 (/private/tmp/cargo-test/a)
+ 🔴 │   └── b v0.1.0 (/private/tmp/cargo-test/b)
+ 🔴 │       └── c v0.1.0 (/private/tmp/cargo-test/c)
+ 🔴 └── d v0.1.0 (/private/tmp/cargo-test/d)
+ 🔴     └── b v0.1.0 (/private/tmp/cargo-test/b)
+ 🔴         └── c v0.1.0 (/private/tmp/cargo-test/c)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())

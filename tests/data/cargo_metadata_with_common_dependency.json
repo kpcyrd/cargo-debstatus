@@ -1,0 +1,390 @@
+{
+  "packages": [
+    {
+      "name": "a",
+      "version": "0.1.0",
+      "id": "path+file:///private/tmp/cargo-test/a#0.1.0",
+      "license": null,
+      "license_file": null,
+      "description": null,
+      "source": null,
+      "dependencies": [
+        {
+          "name": "b",
+          "source": null,
+          "req": "*",
+          "kind": null,
+          "rename": null,
+          "optional": false,
+          "uses_default_features": true,
+          "features": [],
+          "target": null,
+          "registry": null,
+          "path": "/private/tmp/cargo-test/b"
+        }
+      ],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "a",
+          "src_path": "/private/tmp/cargo-test/a/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        }
+      ],
+      "features": {},
+      "manifest_path": "/private/tmp/cargo-test/a/Cargo.toml",
+      "metadata": null,
+      "publish": null,
+      "authors": [],
+      "categories": [],
+      "keywords": [],
+      "readme": null,
+      "repository": null,
+      "homepage": null,
+      "documentation": null,
+      "edition": "2024",
+      "links": null,
+      "default_run": null,
+      "rust_version": null
+    },
+    {
+      "name": "b",
+      "version": "0.1.0",
+      "id": "path+file:///private/tmp/cargo-test/b#0.1.0",
+      "license": null,
+      "license_file": null,
+      "description": null,
+      "source": null,
+      "dependencies": [
+        {
+          "name": "c",
+          "source": null,
+          "req": "*",
+          "kind": null,
+          "rename": null,
+          "optional": false,
+          "uses_default_features": true,
+          "features": [],
+          "target": null,
+          "registry": null,
+          "path": "/private/tmp/cargo-test/c"
+        }
+      ],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "b",
+          "src_path": "/private/tmp/cargo-test/b/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        }
+      ],
+      "features": {},
+      "manifest_path": "/private/tmp/cargo-test/b/Cargo.toml",
+      "metadata": null,
+      "publish": null,
+      "authors": [],
+      "categories": [],
+      "keywords": [],
+      "readme": null,
+      "repository": null,
+      "homepage": null,
+      "documentation": null,
+      "edition": "2024",
+      "links": null,
+      "default_run": null,
+      "rust_version": null
+    },
+    {
+      "name": "c",
+      "version": "0.1.0",
+      "id": "path+file:///private/tmp/cargo-test/c#0.1.0",
+      "license": null,
+      "license_file": null,
+      "description": null,
+      "source": null,
+      "dependencies": [],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "c",
+          "src_path": "/private/tmp/cargo-test/c/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        }
+      ],
+      "features": {},
+      "manifest_path": "/private/tmp/cargo-test/c/Cargo.toml",
+      "metadata": null,
+      "publish": null,
+      "authors": [],
+      "categories": [],
+      "keywords": [],
+      "readme": null,
+      "repository": null,
+      "homepage": null,
+      "documentation": null,
+      "edition": "2024",
+      "links": null,
+      "default_run": null,
+      "rust_version": null
+    },
+    {
+      "name": "cargo-test",
+      "version": "0.1.0",
+      "id": "path+file:///private/tmp/cargo-test#0.1.0",
+      "license": null,
+      "license_file": null,
+      "description": null,
+      "source": null,
+      "dependencies": [
+        {
+          "name": "a",
+          "source": null,
+          "req": "*",
+          "kind": null,
+          "rename": null,
+          "optional": false,
+          "uses_default_features": true,
+          "features": [],
+          "target": null,
+          "registry": null,
+          "path": "/private/tmp/cargo-test/a"
+        },
+        {
+          "name": "d",
+          "source": null,
+          "req": "*",
+          "kind": null,
+          "rename": null,
+          "optional": false,
+          "uses_default_features": true,
+          "features": [],
+          "target": null,
+          "registry": null,
+          "path": "/private/tmp/cargo-test/d"
+        }
+      ],
+      "targets": [
+        {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "cargo-test",
+          "src_path": "/private/tmp/cargo-test/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        }
+      ],
+      "features": {},
+      "manifest_path": "/private/tmp/cargo-test/Cargo.toml",
+      "metadata": null,
+      "publish": null,
+      "authors": [],
+      "categories": [],
+      "keywords": [],
+      "readme": null,
+      "repository": null,
+      "homepage": null,
+      "documentation": null,
+      "edition": "2024",
+      "links": null,
+      "default_run": null,
+      "rust_version": null
+    },
+    {
+      "name": "d",
+      "version": "0.1.0",
+      "id": "path+file:///private/tmp/cargo-test/d#0.1.0",
+      "license": null,
+      "license_file": null,
+      "description": null,
+      "source": null,
+      "dependencies": [
+        {
+          "name": "b",
+          "source": null,
+          "req": "*",
+          "kind": null,
+          "rename": null,
+          "optional": false,
+          "uses_default_features": true,
+          "features": [],
+          "target": null,
+          "registry": null,
+          "path": "/private/tmp/cargo-test/b"
+        }
+      ],
+      "targets": [
+        {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "d",
+          "src_path": "/private/tmp/cargo-test/d/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        }
+      ],
+      "features": {},
+      "manifest_path": "/private/tmp/cargo-test/d/Cargo.toml",
+      "metadata": null,
+      "publish": null,
+      "authors": [],
+      "categories": [],
+      "keywords": [],
+      "readme": null,
+      "repository": null,
+      "homepage": null,
+      "documentation": null,
+      "edition": "2024",
+      "links": null,
+      "default_run": null,
+      "rust_version": null
+    }
+  ],
+  "workspace_members": [
+    "path+file:///private/tmp/cargo-test#0.1.0",
+    "path+file:///private/tmp/cargo-test/a#0.1.0",
+    "path+file:///private/tmp/cargo-test/b#0.1.0",
+    "path+file:///private/tmp/cargo-test/c#0.1.0",
+    "path+file:///private/tmp/cargo-test/d#0.1.0"
+  ],
+  "workspace_default_members": [
+    "path+file:///private/tmp/cargo-test#0.1.0"
+  ],
+  "resolve": {
+    "nodes": [
+      {
+        "id": "path+file:///private/tmp/cargo-test/a#0.1.0",
+        "dependencies": [
+          "path+file:///private/tmp/cargo-test/b#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "b",
+            "pkg": "path+file:///private/tmp/cargo-test/b#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///private/tmp/cargo-test/b#0.1.0",
+        "dependencies": [
+          "path+file:///private/tmp/cargo-test/c#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "c",
+            "pkg": "path+file:///private/tmp/cargo-test/c#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///private/tmp/cargo-test/c#0.1.0",
+        "dependencies": [],
+        "deps": [],
+        "features": []
+      },
+      {
+        "id": "path+file:///private/tmp/cargo-test#0.1.0",
+        "dependencies": [
+          "path+file:///private/tmp/cargo-test/a#0.1.0",
+          "path+file:///private/tmp/cargo-test/d#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "a",
+            "pkg": "path+file:///private/tmp/cargo-test/a#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "d",
+            "pkg": "path+file:///private/tmp/cargo-test/d#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      },
+      {
+        "id": "path+file:///private/tmp/cargo-test/d#0.1.0",
+        "dependencies": [
+          "path+file:///private/tmp/cargo-test/b#0.1.0"
+        ],
+        "deps": [
+          {
+            "name": "b",
+            "pkg": "path+file:///private/tmp/cargo-test/b#0.1.0",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "features": []
+      }
+    ],
+    "root": "path+file:///private/tmp/cargo-test#0.1.0"
+  },
+  "target_directory": "/private/tmp/cargo-test/target",
+  "version": 1,
+  "workspace_root": "/private/tmp/cargo-test",
+  "metadata": null
+}
