@@ -377,7 +377,7 @@ mod tests {
 
         print(&args, &graph, &mut buffer)?;
 
-        let expected = r#" 🔴 cargotest v0.1.0 (/tmp/cargotest)
+        let expected = r#" 🪏  cargotest v0.1.0 (in workspace, /tmp/cargotest)
  🔴 └── crossbeam-channel v0.5.15
  🔴     └── crossbeam-utils v0.8.21
 "#;
@@ -395,7 +395,7 @@ mod tests {
 
         print(&args, &graph, &mut buffer)?;
 
-        let expected = r#" 🔴 cargotest v0.1.0 (/tmp/cargotest)
+        let expected = r#" 🪏  cargotest v0.1.0 (in workspace, /tmp/cargotest)
  🔴 └── crossbeam-channel v0.5.15
  🔴     └── crossbeam-utils v0.8.21
  🔴         └── crossbeam-channel v0.5.15
@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn print_tree_with_common_dependency() -> Result<(), Error> {
-        let args = Args::parse_from(["debstatus"]);
+        let args = Args::parse_from(["debstatus", "-w"]);
         let metadata: Metadata = serde_json::from_str(include_str!(
             "../tests/data/cargo_metadata_with_common_dependency.json"
         ))?;
@@ -415,13 +415,13 @@ mod tests {
 
         print(&args, &graph, &mut buffer)?;
 
-        let expected = r#" 🔴 cargo-test v0.1.0 (/private/tmp/cargo-test)
- 🔴 ├── a v0.1.0 (/private/tmp/cargo-test/a)
- 🔴 │   └── b v0.1.0 (/private/tmp/cargo-test/b)
- 🔴 │       └── c v0.1.0 (/private/tmp/cargo-test/c)
- 🔴 └── d v0.1.0 (/private/tmp/cargo-test/d)
- 🔴     └── b v0.1.0 (/private/tmp/cargo-test/b)
- 🔴         └── c v0.1.0 (/private/tmp/cargo-test/c)
+        let expected = r#" 🪏  cargo-test v0.1.0 (in workspace, /private/tmp/cargo-test)
+ 🪏  ├── a v0.1.0 (in workspace, /private/tmp/cargo-test/a)
+ 🪏  │   └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
+ 🪏  │       └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
+ 🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
+ 🪏      └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
+ 🪏          └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn print_dependency_status_in_debian() -> Result<(), Error> {
-        let args = Args::parse_from(["debstatus"]);
+        let args = Args::parse_from(["debstatus", "-w"]);
         let metadata: Metadata = serde_json::from_str(include_str!(
             "../tests/data/cargo_metadata_with_flat_dependencies.json"
         ))?;
@@ -515,11 +515,11 @@ mod tests {
         let output = String::from_utf8(strip(buffer)).unwrap();
 
         let expected = " \
-🔴 cargo-test v1.0.0 (/private/tmp/cargo-test)
-    ├── a v1.0.0 (in debian) (/private/tmp/cargo-test/a)
- 🔽 ├── b v1.0.0 (newer, 2.1.0 in debian) (/private/tmp/cargo-test/b)
- ⌛ ├── c v1.0.0 (outdated, 0.4.5 in debian) (/private/tmp/cargo-test/c)
- 🔴 └── d v1.0.0 (/private/tmp/cargo-test/d)\n";
+ 🪏  cargo-test v1.0.0 (in workspace, /private/tmp/cargo-test)
+    ├── a v1.0.0 (in debian) (in workspace, /private/tmp/cargo-test/a)
+ 🔽 ├── b v1.0.0 (newer, 2.1.0 in debian) (in workspace, /private/tmp/cargo-test/b)
+ ⌛ ├── c v1.0.0 (outdated, 0.4.5 in debian) (in workspace, /private/tmp/cargo-test/c)
+ 🪏  └── d v1.0.0 (in workspace, /private/tmp/cargo-test/d)\n";
         assert_eq!(output, expected);
         Ok(())
     }
