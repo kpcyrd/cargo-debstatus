@@ -26,7 +26,10 @@ pub struct Pkg {
 pub enum PackagingProgress {
     Available,
     AvailableInNew,
+    /// debian has an older version of this dependency, which needs to be updated
     NeedsUpdate,
+    /// debian has a newer version of this dependency, so we need to patch its dependent
+    NeedsPatching,
     Missing,
 }
 
@@ -40,6 +43,7 @@ impl fmt::Display for PackagingProgress {
             PackagingProgress::Available => "  ",
             PackagingProgress::AvailableInNew => "✨",
             PackagingProgress::NeedsUpdate => "⌛",
+            PackagingProgress::NeedsPatching => "🔽",
             PackagingProgress::Missing => "🔴",
         };
         write!(f, "{}", icon)
@@ -89,6 +93,8 @@ impl Pkg {
                     PackagingProgress::Available
                 } else if deb.outdated {
                     PackagingProgress::NeedsUpdate
+                } else if deb.newer {
+                    PackagingProgress::NeedsPatching
                 } else {
                     PackagingProgress::Available
                 }
@@ -98,11 +104,15 @@ impl Pkg {
                 } else if deb.outdated {
                     // Outdated; in the NEW queue
                     PackagingProgress::NeedsUpdate
+                } else if deb.newer {
+                    PackagingProgress::NeedsPatching
                 } else {
                     PackagingProgress::AvailableInNew
                 }
             } else if deb.outdated {
                 PackagingProgress::NeedsUpdate
+            } else if deb.newer {
+                PackagingProgress::NeedsPatching
             } else {
                 PackagingProgress::Missing
             }
@@ -117,6 +127,7 @@ pub struct DebianInfo {
     pub in_unstable: bool,
     pub in_new: bool,
     pub outdated: bool,
+    pub newer: bool,
     pub compatible: bool,
     pub exact_match: bool,
     pub version: String,
@@ -127,6 +138,7 @@ fn run_task<C: Client>(db: &mut Connection<C>, pkg: Pkg, skip_cache: bool) -> Re
         in_unstable: false,
         in_new: false,
         outdated: false,
+        newer: false,
         compatible: false,
         exact_match: false,
         version: String::new(),
@@ -146,6 +158,7 @@ fn run_task<C: Client>(db: &mut Connection<C>, pkg: Pkg, skip_cache: bool) -> Re
 
     match info.status {
         PkgStatus::Outdated => deb.outdated = true,
+        PkgStatus::TooRecent => deb.newer = true,
         PkgStatus::Compatible => deb.compatible = true,
         PkgStatus::Found => deb.exact_match = true,
         _ => (),

@@ -514,7 +514,7 @@ mod tests {
         let expected = " \
 🔴 cargo-test v1.0.0 (/private/tmp/cargo-test)
     ├── a v1.0.0 (in debian) (/private/tmp/cargo-test/a)
- ⌛ ├── b v1.0.0 (outdated, 2.1.0 in debian) (/private/tmp/cargo-test/b)
+ 🔽 ├── b v1.0.0 (newer, 2.1.0 in debian) (/private/tmp/cargo-test/b)
  ⌛ ├── c v1.0.0 (outdated, 0.4.5 in debian) (/private/tmp/cargo-test/c)
  🔴 └── d v1.0.0 (/private/tmp/cargo-test/d)\n";
         assert_eq!(output, expected);

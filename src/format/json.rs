@@ -19,6 +19,7 @@ pub struct DebianJson {
     in_new: bool,
     in_unstable: bool,
     outdated: bool,
+    newer: bool,
 }
 
 impl Json {
@@ -30,6 +31,7 @@ impl Json {
             in_new: deb.in_new,
             in_unstable: deb.in_unstable,
             outdated: deb.outdated,
+            newer: deb.newer,
         });
 
         Json {
