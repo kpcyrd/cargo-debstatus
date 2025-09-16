@@ -295,13 +295,12 @@ impl<C: Client> Connection<C> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
+pub(crate) mod tests {
+    use std::{collections::HashMap, path::Path};
 
     use crate::db::{is_compatible, Connection, PkgStatus, PkgType};
     use anyhow::anyhow;
     use semver::{Version, VersionReq};
-    use tempfile::TempDir;
 
     use super::Client;
 
@@ -310,7 +309,7 @@ mod tests {
     /// Mocked SQL query results
     type ResultRows<'a> = Vec<Vec<&'a str>>;
 
-    struct MockClient<'a> {
+    pub(crate) struct MockClient<'a> {
         responses: HashMap<MockedQuery<'a>, ResultRows<'a>>,
     }
 
@@ -336,8 +335,8 @@ mod tests {
         }
     }
 
-    fn mock_connection<'a>(
-        tempdir: &TempDir,
+    pub(crate) fn mock_connection<'a>(
+        tempdir: &'a Path,
         mocked_responses: &'a [(&str, Vec<&str>, ResultRows<'a>)],
     ) -> Connection<MockClient<'a>> {
         let responses = mocked_responses
@@ -352,7 +351,7 @@ mod tests {
             })
             .collect();
         let mock_client = MockClient { responses };
-        let cache_dir = tempdir.path().to_owned();
+        let cache_dir = tempdir.to_owned();
 
         Connection {
             sock: mock_client,
@@ -398,7 +397,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search("usvg", &Version::parse("0.45.0").unwrap(), true)
             .unwrap();
@@ -423,7 +422,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search("vivid", &Version::parse("0.9.0").unwrap(), true)
             .unwrap();
@@ -451,7 +450,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search_generic(
                 query,
@@ -510,7 +509,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search_generic(
                 query,

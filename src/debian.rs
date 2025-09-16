@@ -5,6 +5,7 @@ use crate::graph::Graph;
 use cargo_metadata::{Package, PackageId, Source};
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+use log::error;
 use semver::Version;
 use std::path::PathBuf;
 use std::thread;
@@ -131,9 +132,9 @@ fn run_task<C: Client>(db: &mut Connection<C>, pkg: Pkg, skip_cache: bool) -> Re
         version: String::new(),
     };
 
-    let mut info = db.search(&pkg.name, &pkg.version, skip_cache).unwrap();
+    let mut info = db.search(&pkg.name, &pkg.version, skip_cache)?;
     if info.status == PkgStatus::NotFound {
-        info = db.search_new(&pkg.name, &pkg.version, skip_cache).unwrap();
+        info = db.search_new(&pkg.name, &pkg.version, skip_cache)?;
         if info.status != PkgStatus::NotFound {
             deb.in_new = true;
             deb.version = info.version;
@@ -153,7 +154,11 @@ fn run_task<C: Client>(db: &mut Connection<C>, pkg: Pkg, skip_cache: bool) -> Re
     Ok(deb)
 }
 
-pub fn populate(graph: &mut Graph, args: &Args) -> Result<(), Error> {
+pub fn populate<C: Client>(
+    graph: &mut Graph,
+    args: &Args,
+    new_connection: &'static (impl Fn() -> Result<Connection<C>, Error> + Send + Sync),
+) -> Result<(), Error> {
     let (task_tx, task_rx) = crossbeam_channel::unbounded();
     let (return_tx, return_rx) = crossbeam_channel::unbounded();
 
@@ -164,7 +169,7 @@ pub fn populate(graph: &mut Graph, args: &Args) -> Result<(), Error> {
         let return_tx = return_tx.clone();
 
         thread::spawn(move || {
-            let mut db = match Connection::new() {
+            let mut db = match new_connection() {
                 Ok(db) => db,
                 Err(err) => {
                     return_tx.send(Err(err)).unwrap();
@@ -174,7 +179,8 @@ pub fn populate(graph: &mut Graph, args: &Args) -> Result<(), Error> {
 
             for (idx, pkg) in task_rx {
                 let deb = run_task(&mut db, pkg, args.skip_cache);
-                if return_tx.send(Ok((idx, deb))).is_err() {
+                if let Err(err) = return_tx.send(Ok((idx, deb))) {
+                    error!("could not send task result: {err}");
                     break;
                 }
             }
