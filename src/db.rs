@@ -1,7 +1,7 @@
 use crate::errors::*;
 use postgres::types::ToSql;
 use postgres::{Client as LiveClient, NoTls};
-use semver::{Version, VersionReq};
+use semver::{Comparator, Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -15,6 +15,7 @@ pub enum PkgStatus {
     NotFound,
     Outdated,
     Compatible,
+    TooRecent,
     Found,
 }
 
@@ -53,6 +54,44 @@ fn parse_deb_version(debversion: &str) -> Result<Version> {
 fn is_compatible(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
     let debversion = parse_deb_version(debversion)?;
     Ok(crateversion.matches(&debversion))
+}
+
+/// Check if the debian version of a crate is newer than (or as recent as) all
+/// of the bounds mentioned in the crate version requirements.
+fn is_newer(debversion: &str, crateversion: &VersionReq) -> Result<bool, Error> {
+    let debversion = parse_deb_version(debversion)?;
+    Ok(crateversion
+        .comparators
+        .iter()
+        .all(|version_req| matches_greater_or_equal(version_req, &debversion)))
+}
+
+// Check if a given version is greater or equal than the version mentioned in a requirement.
+// Adapted from semver 1.0.26, Apache License, Version 2.0 or MIT license.
+fn matches_greater_or_equal(cmp: &Comparator, ver: &Version) -> bool {
+    if ver.major != cmp.major {
+        return ver.major > cmp.major;
+    }
+
+    match cmp.minor {
+        None => return true,
+        Some(minor) => {
+            if ver.minor != minor {
+                return ver.minor > minor;
+            }
+        }
+    }
+
+    match cmp.patch {
+        None => return true,
+        Some(patch) => {
+            if ver.patch != patch {
+                return ver.patch > patch;
+            }
+        }
+    }
+
+    ver.pre >= cmp.pre
 }
 
 /// Trait which abstracts the SQL database for testing purposes
@@ -289,19 +328,24 @@ impl<C: Client> Connection<C> {
             }
         }
 
+        if info.status == PkgStatus::Outdated {
+            if let Ok(true) = is_newer(&info.version, &version) {
+                info.status = PkgStatus::TooRecent
+            }
+        }
+
         debug!("{package} {:?}", info);
         Ok(info)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
+pub(crate) mod tests {
+    use std::{collections::HashMap, path::Path};
 
-    use crate::db::{is_compatible, Connection, PkgStatus, PkgType};
+    use crate::db::{is_compatible, is_newer, Connection, PkgStatus, PkgType};
     use anyhow::anyhow;
     use semver::{Version, VersionReq};
-    use tempfile::TempDir;
 
     use super::Client;
 
@@ -310,7 +354,7 @@ mod tests {
     /// Mocked SQL query results
     type ResultRows<'a> = Vec<Vec<&'a str>>;
 
-    struct MockClient<'a> {
+    pub(crate) struct MockClient<'a> {
         responses: HashMap<MockedQuery<'a>, ResultRows<'a>>,
     }
 
@@ -336,8 +380,8 @@ mod tests {
         }
     }
 
-    fn mock_connection<'a>(
-        tempdir: &TempDir,
+    pub(crate) fn mock_connection<'a>(
+        tempdir: &'a Path,
         mocked_responses: &'a [(&str, Vec<&str>, ResultRows<'a>)],
     ) -> Connection<MockClient<'a>> {
         let responses = mocked_responses
@@ -352,7 +396,7 @@ mod tests {
             })
             .collect();
         let mock_client = MockClient { responses };
-        let cache_dir = tempdir.path().to_owned();
+        let cache_dir = tempdir.to_owned();
 
         Connection {
             sock: mock_client,
@@ -382,6 +426,13 @@ mod tests {
     }
 
     #[test]
+    fn is_newer_works() {
+        assert!(is_newer("2.1.0", &VersionReq::parse(">=1.4, <2").unwrap()).unwrap());
+        assert!(!is_newer("1.7.2", &VersionReq::parse(">=1.4, <2").unwrap()).unwrap());
+        assert!(!is_newer("1.2.3", &VersionReq::parse(">=1.4, <2").unwrap()).unwrap());
+    }
+
+    #[test]
     fn find_via_lib_package_name() {
         // crate "usvg" is not packaged from the "resvg" source package, not "rust-usvg"
         let mocked_responses = &[
@@ -398,7 +449,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search("usvg", &Version::parse("0.45.0").unwrap(), true)
             .unwrap();
@@ -423,7 +474,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search("vivid", &Version::parse("0.9.0").unwrap(), true)
             .unwrap();
@@ -439,6 +490,11 @@ mod tests {
         let mocked_responses = &[
             (
                 query,
+                vec!["rust-serde", "rust-serde-0.4"],
+                vec![vec!["1.0.106-1"]],
+            ),
+            (
+                query,
                 vec!["rust-serde", "rust-serde-1"],
                 vec![vec!["1.0.106-1"]],
             ),
@@ -451,7 +507,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search_generic(
                 query,
@@ -483,6 +539,15 @@ mod tests {
         let info = db
             .search_generic(
                 query,
+                "serde",
+                &Version::parse("0.4.5").unwrap(),
+                PkgType::Source,
+            )
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::TooRecent);
+        let info = db
+            .search_generic(
+                query,
                 "notacrate",
                 &Version::parse("1.0.0").unwrap(),
                 PkgType::Source,
@@ -510,7 +575,7 @@ mod tests {
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
-        let mut db = mock_connection(&tmpdir, mocked_responses);
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
         let info = db
             .search_generic(
                 query,

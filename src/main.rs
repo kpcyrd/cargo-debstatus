@@ -1,4 +1,5 @@
 use crate::args::Opts;
+use crate::db::Connection;
 use crate::errors::*;
 use clap::Parser;
 use std::io;
@@ -21,7 +22,7 @@ fn main() -> Result<(), Error> {
     info!("Building graph");
     let mut graph = graph::build(&args, metadata)?;
     info!("Populating with debian data");
-    debian::populate(&mut graph, &args)?;
+    debian::populate(&mut graph, &args, &Connection::new)?;
     info!("Printing graph");
     tree::print(&args, &graph, &mut io::stdout())?;
 

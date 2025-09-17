@@ -351,9 +351,17 @@ mod tests {
     use anyhow::Error;
     use cargo_metadata::Metadata;
     use clap::Parser;
+    use strip_ansi_escapes::strip;
 
     use super::print;
-    use crate::{args::Args, graph};
+    use crate::{
+        args::Args,
+        db::{
+            tests::{mock_connection, MockClient},
+            Connection,
+        },
+        debian, graph,
+    };
 
     #[test]
     fn print_tree_without_dependency_loop() -> Result<(), Error> {
@@ -413,6 +421,103 @@ mod tests {
  🔴         └── c v0.1.0 (/private/tmp/cargo-test/c)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
+
+    fn new_mock_connection() -> Result<Connection<MockClient<'static>>, Error> {
+        // TODO: the tmp dir created by this test isn't deleted.
+        // Change ownership so that it is.
+        let tmpdir = Box::leak(Box::new(
+            tempfile::tempdir()
+                .expect("could not create a temporary directory for the cache")
+                .keep(),
+        ));
+        let mocked_responses = Box::leak(Box::new(vec![
+            (
+                "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
+                vec!["rust-a", "rust-a-1"],
+                vec![vec!["1.0.0-2"]],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-a-dev", "librust-a-1-dev"],
+                vec![vec!["1.0.0-2"]],
+            ),
+            (
+                "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
+                vec!["rust-b", "rust-b-1"],
+                vec![vec!["2.1.0-1"]],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-b-dev", "librust-b-1-dev"],
+                vec![vec!["2.1.0-1"]],
+            ),
+            (
+                "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
+                vec!["rust-c", "rust-c-1"],
+                vec![vec!["0.4.5-1"]],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-c-dev", "librust-c-1-dev"],
+                vec![vec!["0.4.5-1"]],
+            ),
+            (
+                "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
+                vec!["rust-d", "rust-d-1"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM new_sources WHERE source in ($1, $2);",
+                vec!["rust-d", "rust-d-1"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-d-dev", "librust-d-1-dev"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
+                vec!["rust-cargo-test", "rust-cargo-test-1"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM new_sources WHERE source in ($1, $2);",
+                vec!["rust-cargo-test", "rust-cargo-test-1"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-cargo-test-dev", "librust-cargo-test-1-dev"],
+                vec![],
+            ),
+        ]));
+        Ok(mock_connection(tmpdir, mocked_responses))
+    }
+
+    #[test]
+    fn print_dependency_status_in_debian() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_with_flat_dependencies.json"
+        ))?;
+        let mut graph = graph::build(&args, metadata)?;
+        debian::populate(&mut graph, &args, &new_mock_connection)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let output = String::from_utf8(strip(buffer)).unwrap();
+
+        let expected = " \
+🔴 cargo-test v1.0.0 (/private/tmp/cargo-test)
+    ├── a v1.0.0 (in debian) (/private/tmp/cargo-test/a)
+ 🔽 ├── b v1.0.0 (newer, 2.1.0 in debian) (/private/tmp/cargo-test/b)
+ ⌛ ├── c v1.0.0 (outdated, 0.4.5 in debian) (/private/tmp/cargo-test/c)
+ 🔴 └── d v1.0.0 (/private/tmp/cargo-test/d)\n";
+        assert_eq!(output, expected);
         Ok(())
     }
 }

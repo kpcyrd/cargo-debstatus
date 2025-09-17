@@ -22,6 +22,13 @@ pub fn display(pattern: &Pattern, package: &Pkg) -> Result<String, Error> {
                                 pkg.yellow(),
                                 deb.version.red()
                             )?;
+                        } else if deb.newer {
+                            write!(
+                                fmt,
+                                "{} (newer, {} in debian)",
+                                pkg.yellow(),
+                                deb.version.magenta()
+                            )?;
                         } else {
                             write!(fmt, "{} (in debian)", pkg.green())?;
                         }
