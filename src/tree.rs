@@ -523,4 +523,27 @@ mod tests {
         assert_eq!(output, expected);
         Ok(())
     }
+
+    #[test]
+    fn print_only_missing() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus", "--filter", "missing", "-p", "cargo-test"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_with_flat_dependencies.json"
+        ))?;
+        let mut graph = graph::build(&args, metadata)?;
+        debian::populate(&mut graph, &args, &new_mock_connection)?;
+        args.filter.run(&mut graph);
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let output = String::from_utf8(buffer).unwrap();
+        println!("{output}");
+
+        let expected = " \
+🪏  cargo-test v1.0.0 (in workspace, /private/tmp/cargo-test)
+ 🪏  └── d v1.0.0 (in workspace, /private/tmp/cargo-test/d)\n";
+        assert_eq!(output, expected);
+        Ok(())
+    }
 }
