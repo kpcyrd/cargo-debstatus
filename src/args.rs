@@ -86,9 +86,6 @@ pub struct Args {
     #[clap(long = "quiet", short = 'q')]
     /// No output printed to stdout other than the tree
     pub quiet: bool,
-    #[clap(long = "color", value_name = "WHEN")]
-    /// Coloring: auto, always, never
-    pub color: Option<String>,
     #[clap(long = "frozen")]
     /// Require Cargo.lock and cache are up to date
     pub frozen: bool,
