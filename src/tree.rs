@@ -200,6 +200,7 @@ fn print_package<'a, W: Write>(
     levels_continue: &mut Vec<bool>,
     writer: &mut W,
 ) -> Result<(), Error> {
+    let already_visited = !visited_deps.insert(&package.id);
     let treeline = {
         let mut line = "".to_string();
         line.push_str(&format!(" {} ", &package.packaging_status()));
@@ -233,12 +234,11 @@ fn print_package<'a, W: Write>(
         )?;
     } else {
         let pkg_status_s = format::human::display(format, package)?;
-        writeln!(writer, "{treeline}{pkg_status_s}")?;
+        let already_visited_s = if already_visited { " (*)" } else { "" };
+        writeln!(writer, "{treeline}{pkg_status_s}{already_visited_s}")?;
     }
 
-    if !all && !package.show_dependencies() && !levels_continue.is_empty()
-        || !visited_deps.insert(&package.id)
-    {
+    if !all && !package.show_dependencies() && !levels_continue.is_empty() || already_visited {
         return Ok(());
     }
 
@@ -398,7 +398,7 @@ mod tests {
         let expected = r#" 🪏  cargotest v0.1.0 (in workspace, /tmp/cargotest)
  🔴 └── crossbeam-channel v0.5.15
  🔴     └── crossbeam-utils v0.8.21
- 🔴         └── crossbeam-channel v0.5.15
+ 🔴         └── crossbeam-channel v0.5.15 (*)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())
