@@ -70,7 +70,7 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
 
             let root = &graph.graph[graph.nodes[*package]];
             print_tree(
-                graph, root, &format, direction, symbols, prefix, args.all, args.json, writer,
+                graph, root, &format, direction, symbols, prefix, args, writer,
             )?;
         }
     } else {
@@ -85,7 +85,7 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
 
             let root = &graph.graph[graph.nodes[root]];
             print_tree(
-                graph, root, &format, direction, symbols, prefix, args.all, args.json, writer,
+                graph, root, &format, direction, symbols, prefix, args, writer,
             )?;
         }
     }
@@ -165,8 +165,7 @@ fn print_tree<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all: bool,
-    json: bool,
+    config: &Args,
     writer: &mut W,
 ) -> Result<(), Error> {
     let mut visited_deps = HashSet::new();
@@ -179,8 +178,7 @@ fn print_tree<'a, W: Write>(
         direction,
         symbols,
         prefix,
-        all,
-        json,
+        config,
         &mut visited_deps,
         &mut levels_continue,
         writer,
@@ -194,8 +192,7 @@ fn print_package<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all: bool,
-    json: bool,
+    config: &Args,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     writer: &mut W,
@@ -226,7 +223,7 @@ fn print_package<'a, W: Write>(
         line
     };
 
-    if json {
+    if config.json {
         writeln!(
             writer,
             "{}",
@@ -238,7 +235,8 @@ fn print_package<'a, W: Write>(
         writeln!(writer, "{treeline}{pkg_status_s}{already_visited_s}")?;
     }
 
-    if !all && !package.show_dependencies() && !levels_continue.is_empty() || already_visited {
+    if !config.all && !package.show_dependencies() && !levels_continue.is_empty() || already_visited
+    {
         return Ok(());
     }
 
@@ -254,8 +252,7 @@ fn print_package<'a, W: Write>(
             direction,
             symbols,
             prefix,
-            all,
-            json,
+            config,
             visited_deps,
             levels_continue,
             *kind,
@@ -273,8 +270,7 @@ fn print_dependencies<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all: bool,
-    json: bool,
+    config: &Args,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     kind: DependencyKind,
@@ -301,7 +297,7 @@ fn print_dependencies<'a, W: Write>(
     // ensure a consistent output ordering
     deps.sort_by_key(|p| &p.id);
 
-    if !json {
+    if !config.json {
         let name = match kind {
             DependencyKind::Normal => None,
             DependencyKind::Build => Some("[build-dependencies]"),
@@ -336,8 +332,7 @@ fn print_dependencies<'a, W: Write>(
             direction,
             symbols,
             prefix,
-            all,
-            json,
+            config,
             &mut visited_deps.clone(),
             levels_continue,
             writer,
