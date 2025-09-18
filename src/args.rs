@@ -61,8 +61,11 @@ pub struct Args {
     /// Display the dependencies as a list (rather than a tree), but prefixed with the depth
     pub prefix_depth: bool,
     #[clap(long = "all", short = 'a')]
-    /// Don't truncate dependencies that have already been displayed
+    /// Show dependencies even for crates that have an exact match in Debian
     pub all: bool,
+    #[clap(long = "compact", short = 'c')]
+    /// Don't repeat the dependencies of crates already displayed earlier
+    pub compact: bool,
     #[clap(long = "json")]
     /// Print package information as machine-readable output
     pub json: bool,

@@ -259,7 +259,6 @@ fn print_package<'a, W: Write>(
             writer,
         )?;
     }
-
     Ok(())
 }
 
@@ -325,6 +324,7 @@ fn print_dependencies<'a, W: Write>(
     let mut it = deps.iter().peekable();
     while let Some(dependency) = it.next() {
         levels_continue.push(it.peek().is_some());
+        let mut visited_deps_clone = visited_deps.clone();
         print_package(
             graph,
             dependency,
@@ -333,7 +333,11 @@ fn print_dependencies<'a, W: Write>(
             symbols,
             prefix,
             config,
-            &mut visited_deps.clone(),
+            if config.compact {
+                visited_deps
+            } else {
+                &mut visited_deps_clone
+            },
             levels_continue,
             writer,
         )?;
@@ -417,6 +421,28 @@ mod tests {
  🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
  🪏      └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
  🪏          └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
+"#;
+        assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn print_compact_tree() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus", "--compact", "-p", "cargo-test"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_with_common_dependency.json"
+        ))?;
+        let graph = graph::build(&args, metadata)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let expected = r#" 🪏  cargo-test v0.1.0 (in workspace, /private/tmp/cargo-test)
+ 🪏  ├── a v0.1.0 (in workspace, /private/tmp/cargo-test/a)
+ 🪏  │   └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
+ 🪏  │       └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
+ 🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
+ 🪏      └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b) (*)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())
