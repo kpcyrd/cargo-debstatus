@@ -46,10 +46,6 @@ pub fn get(args: &Args) -> Result<Metadata, Error> {
         command.arg("-v");
     }
 
-    if let Some(color) = &args.color {
-        command.arg("--color").arg(color);
-    }
-
     if args.frozen {
         command.arg("--frozen");
     }

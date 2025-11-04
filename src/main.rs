@@ -1,7 +1,8 @@
-use crate::args::Opts;
+use crate::args::{ColorMode, Opts};
 use crate::db::Connection;
 use crate::errors::*;
 use clap::Parser;
+use colored::control::set_override;
 use std::io;
 
 mod args;
@@ -17,6 +18,11 @@ fn main() -> Result<(), Error> {
     env_logger::init();
 
     let Opts::Tree(args) = Opts::parse();
+    if args.color == ColorMode::Always {
+        set_override(true);
+    } else if args.color == ColorMode::Never {
+        set_override(false);
+    }
     info!("Reading metadata");
     let metadata = metadata::get(&args)?;
     info!("Building graph");

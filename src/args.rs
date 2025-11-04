@@ -1,4 +1,5 @@
-use clap::{ArgAction, Parser};
+use clap::{ArgAction, Parser, ValueEnum};
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -8,6 +9,27 @@ pub enum Opts {
     #[clap(name = "debstatus")]
     /// Display a tree visualization of a dependency graph
     Tree(Args),
+}
+
+#[derive(ValueEnum, Clone, Default, Debug, PartialEq, Eq)]
+pub enum ColorMode {
+    /// Do not add colors to the output
+    Never,
+    /// Attempt to detect if the output stream supports colors
+    #[default]
+    Auto,
+    /// Always add colors to the output
+    Always,
+}
+
+impl Display for ColorMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            ColorMode::Never => "never",
+            ColorMode::Auto => "auto",
+            ColorMode::Always => "always",
+        })
+    }
 }
 
 #[derive(Parser, Clone)]
@@ -86,9 +108,9 @@ pub struct Args {
     #[clap(long = "quiet", short = 'q')]
     /// No output printed to stdout other than the tree
     pub quiet: bool,
-    #[clap(long = "color", value_name = "WHEN")]
+    #[clap(long = "color", default_value_t = ColorMode::Auto)]
     /// Coloring: auto, always, never
-    pub color: Option<String>,
+    pub color: ColorMode,
     #[clap(long = "frozen")]
     /// Require Cargo.lock and cache are up to date
     pub frozen: bool,
