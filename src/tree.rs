@@ -63,23 +63,14 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
     };
 
     if args.duplicates {
-        let duplicates = find_duplicates(graph);
-        for (i, package) in duplicates.iter().enumerate() {
+        for (i, package) in find_duplicates(graph).iter().enumerate() {
             if i != 0 {
                 writeln!(writer)?;
             }
 
             let root = &graph.graph[graph.nodes[*package]];
             print_tree(
-                graph,
-                root,
-                &format,
-                direction,
-                symbols,
-                prefix,
-                &duplicates,
-                args,
-                writer,
+                graph, root, &format, direction, symbols, prefix, args, writer,
             )?;
         }
     } else {
@@ -87,14 +78,14 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
             Some(package) => vec![find_package(package, graph)?],
             None => graph.roots.iter().collect(),
         };
-        for (i, root) in roots.iter().enumerate() {
+        for (i, root) in roots.into_iter().enumerate() {
             if i != 0 {
                 println!();
             }
 
             let root = &graph.graph[graph.nodes[root]];
             print_tree(
-                graph, root, &format, direction, symbols, prefix, &roots, args, writer,
+                graph, root, &format, direction, symbols, prefix, args, writer,
             )?;
         }
     }
@@ -174,19 +165,10 @@ fn print_tree<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all_roots: &[&'a PackageId],
     config: &Args,
     writer: &mut W,
 ) -> Result<(), Error> {
     let mut visited_deps = HashSet::new();
-    if config.compact {
-        // mark all the other roots as visited, because we are going to print display them separately
-        visited_deps.extend(
-            all_roots
-                .iter()
-                .filter(|other_root| ***other_root != root.id),
-        );
-    }
     let mut levels_continue = vec![];
 
     print_package(
@@ -461,32 +443,6 @@ mod tests {
  🪏  │       └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
  🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
  🪏      └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b) (*)
-"#;
-        assert_eq!(String::from_utf8(buffer)?, expected);
-        Ok(())
-    }
-
-    #[test]
-    fn print_compact_workspace() -> Result<(), Error> {
-        let args = Args::parse_from(["debstatus", "--compact"]);
-        let metadata: Metadata = serde_json::from_str(include_str!(
-            "../tests/data/cargo_metadata_with_common_dependency.json"
-        ))?;
-        let graph = graph::build(&args, metadata)?;
-        let mut buffer = Vec::new();
-
-        print(&args, &graph, &mut buffer)?;
-
-        let expected = r#" 🪏  cargo-test v0.1.0 (in workspace, /private/tmp/cargo-test)
- 🪏  ├── a v0.1.0 (in workspace, /private/tmp/cargo-test/a) (*)
- 🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d) (*)
- 🪏  a v0.1.0 (in workspace, /private/tmp/cargo-test/a)
- 🪏  └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b) (*)
- 🪏  b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
- 🪏  └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c) (*)
- 🪏  c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
- 🪏  d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
- 🪏  └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b) (*)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())
