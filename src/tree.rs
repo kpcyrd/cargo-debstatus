@@ -447,6 +447,11 @@ mod tests {
                 vec![vec!["1.0.0-2"]],
             ),
             (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                vec!["librust-a-dev", "librust-a-1-dev"],
+                vec![],
+            ),
+            (
                 "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
                 vec!["rust-b", "rust-b-1"],
                 vec![vec!["2.1.0-1"]],
@@ -457,6 +462,11 @@ mod tests {
                 vec![vec!["2.1.0-1"]],
             ),
             (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                vec!["librust-b-dev", "librust-b-1-dev"],
+                vec![],
+            ),
+            (
                 "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
                 vec!["rust-c", "rust-c-1"],
                 vec![vec!["0.4.5-1"]],
@@ -465,6 +475,11 @@ mod tests {
                 "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
                 vec!["librust-c-dev", "librust-c-1-dev"],
                 vec![vec!["0.4.5-1"]],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                vec!["librust-c-dev", "librust-c-1-dev"],
+                vec![],
             ),
             (
                 "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
@@ -482,6 +497,11 @@ mod tests {
                 vec![],
             ),
             (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                vec!["librust-d-dev", "librust-d-1-dev"],
+                vec![],
+            ),
+            (
                 "SELECT version::text FROM sources WHERE source in ($1, $2) AND release='sid';",
                 vec!["rust-cargo-test", "rust-cargo-test-1"],
                 vec![],
@@ -493,6 +513,11 @@ mod tests {
             ),
             (
                 "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-cargo-test-dev", "librust-cargo-test-1-dev"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
                 vec!["librust-cargo-test-dev", "librust-cargo-test-1-dev"],
                 vec![],
             ),
