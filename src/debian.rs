@@ -57,7 +57,7 @@ impl Pkg {
     pub fn new(pkg: Package, workspace_member: bool) -> Pkg {
         Pkg {
             id: pkg.id,
-            name: pkg.name,
+            name: pkg.name.to_string(),
             version: pkg.version,
             workspace_member,
             source: pkg.source,
