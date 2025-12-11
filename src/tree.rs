@@ -70,7 +70,7 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
 
             let root = &graph.graph[graph.nodes[*package]];
             print_tree(
-                graph, root, &format, direction, symbols, prefix, args.all, args.json, writer,
+                graph, root, &format, direction, symbols, prefix, args, writer,
             )?;
         }
     } else {
@@ -85,7 +85,7 @@ pub fn print<W: Write>(args: &Args, graph: &Graph, writer: &mut W) -> Result<(),
 
             let root = &graph.graph[graph.nodes[root]];
             print_tree(
-                graph, root, &format, direction, symbols, prefix, args.all, args.json, writer,
+                graph, root, &format, direction, symbols, prefix, args, writer,
             )?;
         }
     }
@@ -165,8 +165,7 @@ fn print_tree<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all: bool,
-    json: bool,
+    config: &Args,
     writer: &mut W,
 ) -> Result<(), Error> {
     let mut visited_deps = HashSet::new();
@@ -179,8 +178,7 @@ fn print_tree<'a, W: Write>(
         direction,
         symbols,
         prefix,
-        all,
-        json,
+        config,
         &mut visited_deps,
         &mut levels_continue,
         writer,
@@ -194,12 +192,12 @@ fn print_package<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all: bool,
-    json: bool,
+    config: &Args,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     writer: &mut W,
 ) -> Result<(), Error> {
+    let already_visited = !visited_deps.insert(&package.id);
     let treeline = {
         let mut line = "".to_string();
         line.push_str(&format!(" {} ", &package.packaging_status()));
@@ -225,7 +223,7 @@ fn print_package<'a, W: Write>(
         line
     };
 
-    if json {
+    if config.json {
         writeln!(
             writer,
             "{}",
@@ -233,11 +231,11 @@ fn print_package<'a, W: Write>(
         )?;
     } else {
         let pkg_status_s = format::human::display(format, package)?;
-        writeln!(writer, "{treeline}{pkg_status_s}")?;
+        let already_visited_s = if already_visited { " (*)" } else { "" };
+        writeln!(writer, "{treeline}{pkg_status_s}{already_visited_s}")?;
     }
 
-    if !all && !package.show_dependencies() && !levels_continue.is_empty()
-        || !visited_deps.insert(&package.id)
+    if !config.all && !package.show_dependencies() && !levels_continue.is_empty() || already_visited
     {
         return Ok(());
     }
@@ -254,15 +252,13 @@ fn print_package<'a, W: Write>(
             direction,
             symbols,
             prefix,
-            all,
-            json,
+            config,
             visited_deps,
             levels_continue,
             *kind,
             writer,
         )?;
     }
-
     Ok(())
 }
 
@@ -273,8 +269,7 @@ fn print_dependencies<'a, W: Write>(
     direction: EdgeDirection,
     symbols: &Symbols,
     prefix: Prefix,
-    all: bool,
-    json: bool,
+    config: &Args,
     visited_deps: &mut HashSet<&'a PackageId>,
     levels_continue: &mut Vec<bool>,
     kind: DependencyKind,
@@ -301,7 +296,7 @@ fn print_dependencies<'a, W: Write>(
     // ensure a consistent output ordering
     deps.sort_by_key(|p| &p.id);
 
-    if !json {
+    if !config.json {
         let name = match kind {
             DependencyKind::Normal => None,
             DependencyKind::Build => Some("[build-dependencies]"),
@@ -329,6 +324,7 @@ fn print_dependencies<'a, W: Write>(
     let mut it = deps.iter().peekable();
     while let Some(dependency) = it.next() {
         levels_continue.push(it.peek().is_some());
+        let mut visited_deps_clone = visited_deps.clone();
         print_package(
             graph,
             dependency,
@@ -336,9 +332,12 @@ fn print_dependencies<'a, W: Write>(
             direction,
             symbols,
             prefix,
-            all,
-            json,
-            &mut visited_deps.clone(),
+            config,
+            if config.compact {
+                visited_deps
+            } else {
+                &mut visited_deps_clone
+            },
             levels_continue,
             writer,
         )?;
@@ -398,7 +397,7 @@ mod tests {
         let expected = r#" 🪏  cargotest v0.1.0 (in workspace, /tmp/cargotest)
  🔴 └── crossbeam-channel v0.5.15
  🔴     └── crossbeam-utils v0.8.21
- 🔴         └── crossbeam-channel v0.5.15
+ 🔴         └── crossbeam-channel v0.5.15 (*)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())
@@ -422,6 +421,28 @@ mod tests {
  🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
  🪏      └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
  🪏          └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
+"#;
+        assert_eq!(String::from_utf8(buffer)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn print_compact_tree() -> Result<(), Error> {
+        let args = Args::parse_from(["debstatus", "--compact", "-p", "cargo-test"]);
+        let metadata: Metadata = serde_json::from_str(include_str!(
+            "../tests/data/cargo_metadata_with_common_dependency.json"
+        ))?;
+        let graph = graph::build(&args, metadata)?;
+        let mut buffer = Vec::new();
+
+        print(&args, &graph, &mut buffer)?;
+
+        let expected = r#" 🪏  cargo-test v0.1.0 (in workspace, /private/tmp/cargo-test)
+ 🪏  ├── a v0.1.0 (in workspace, /private/tmp/cargo-test/a)
+ 🪏  │   └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b)
+ 🪏  │       └── c v0.1.0 (in workspace, /private/tmp/cargo-test/c)
+ 🪏  └── d v0.1.0 (in workspace, /private/tmp/cargo-test/d)
+ 🪏      └── b v0.1.0 (in workspace, /private/tmp/cargo-test/b) (*)
 "#;
         assert_eq!(String::from_utf8(buffer)?, expected);
         Ok(())
