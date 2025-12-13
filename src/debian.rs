@@ -7,6 +7,7 @@ use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use log::error;
 use semver::Version;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::thread;
 
@@ -22,6 +23,7 @@ pub struct Pkg {
     pub repository: Option<String>,
 
     pub debinfo: Option<DebianInfo>,
+    pub vulnerabilities: Vec<String>,
 }
 
 pub enum PackagingProgress {
@@ -33,8 +35,10 @@ pub enum PackagingProgress {
     NeedsPatching,
     Missing,
     MissingInWorkspace,
+    Vulnerable,
 }
 
+use rustsec::Advisory;
 use std::fmt;
 
 impl fmt::Display for PackagingProgress {
@@ -48,13 +52,19 @@ impl fmt::Display for PackagingProgress {
             PackagingProgress::NeedsPatching => "🔽",
             PackagingProgress::Missing => "🔴",
             PackagingProgress::MissingInWorkspace => "🪏 ",
+            PackagingProgress::Vulnerable => "⚠ ",
         };
         write!(f, "{}", icon)
     }
 }
 
 impl Pkg {
-    pub fn new(pkg: Package, workspace_member: bool) -> Pkg {
+    pub fn new(
+        pkg: Package,
+        workspace_member: bool,
+        vulns: &HashMap<String, Vec<&Advisory>>,
+    ) -> Pkg {
+        let name = pkg.name.clone();
         Pkg {
             id: pkg.id,
             name: pkg.name.to_string(),
@@ -66,6 +76,10 @@ impl Pkg {
             repository: pkg.repository,
 
             debinfo: None,
+            vulnerabilities: vulns
+                .get(&name.to_string())
+                .map(|v| v.iter().map(|a| a.id().as_str().to_string()).collect())
+                .unwrap_or_default(),
         }
     }
 
@@ -90,6 +104,9 @@ impl Pkg {
     }
 
     pub fn packaging_status(&self) -> PackagingProgress {
+        if !self.vulnerabilities.is_empty() {
+            return PackagingProgress::Vulnerable;
+        }
         if let Some(deb) = &self.debinfo {
             if deb.in_unstable {
                 if deb.compatible {
