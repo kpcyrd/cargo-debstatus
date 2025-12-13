@@ -3,7 +3,12 @@ use crate::db::Connection;
 use crate::errors::*;
 use clap::Parser;
 use colored::control::set_override;
+use rustsec::cargo_lock::Name;
+use rustsec::database::Query;
+use rustsec::Database;
+use std::collections::HashMap;
 use std::io;
+use std::str::FromStr;
 
 mod args;
 mod db;
@@ -25,8 +30,17 @@ fn main() -> Result<(), Error> {
     }
     info!("Reading metadata");
     let metadata = metadata::get(&args)?;
+    let database = Database::fetch()?;
+    let mut vulns = HashMap::new();
+    for p in &metadata.packages {
+        let name = Name::from_str(&p.name)?;
+        let q = Query::new()
+            .package_name(name)
+            .package_version(p.version.clone());
+        vulns.insert(p.name.to_string(), database.query(&q));
+    }
     info!("Building graph");
-    let mut graph = graph::build(&args, metadata)?;
+    let mut graph = graph::build(&args, metadata, &vulns)?;
     info!("Populating with debian data");
     debian::populate(&mut graph, &args, &Connection::new)?;
     info!("Printing graph");

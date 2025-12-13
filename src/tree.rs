@@ -350,10 +350,10 @@ fn print_dependencies<'a, W: Write>(
 
 #[cfg(test)]
 mod tests {
-
     use anyhow::Error;
     use cargo_metadata::Metadata;
     use clap::Parser;
+    use std::collections::HashMap;
     use strip_ansi_escapes::strip;
 
     use super::print;
@@ -372,7 +372,7 @@ mod tests {
         let metadata: Metadata = serde_json::from_str(include_str!(
             "../tests/data/cargo_metadata_without_loop.json"
         ))?;
-        let graph = graph::build(&args, metadata)?;
+        let graph = graph::build(&args, metadata, &HashMap::new())?;
         let mut buffer = Vec::new();
 
         print(&args, &graph, &mut buffer)?;
@@ -390,7 +390,7 @@ mod tests {
         let args = Args::parse_from(["debstatus"]);
         let metadata: Metadata =
             serde_json::from_str(include_str!("../tests/data/cargo_metadata_with_loop.json"))?;
-        let graph = graph::build(&args, metadata)?;
+        let graph = graph::build(&args, metadata, &HashMap::new())?;
         let mut buffer = Vec::new();
 
         print(&args, &graph, &mut buffer)?;
@@ -410,7 +410,7 @@ mod tests {
         let metadata: Metadata = serde_json::from_str(include_str!(
             "../tests/data/cargo_metadata_with_common_dependency.json"
         ))?;
-        let graph = graph::build(&args, metadata)?;
+        let graph = graph::build(&args, metadata, &HashMap::new())?;
         let mut buffer = Vec::new();
 
         print(&args, &graph, &mut buffer)?;
@@ -506,7 +506,7 @@ mod tests {
         let metadata: Metadata = serde_json::from_str(include_str!(
             "../tests/data/cargo_metadata_with_flat_dependencies.json"
         ))?;
-        let mut graph = graph::build(&args, metadata)?;
+        let mut graph = graph::build(&args, metadata, &HashMap::new())?;
         debian::populate(&mut graph, &args, &new_mock_connection)?;
         let mut buffer = Vec::new();
 
