@@ -5,6 +5,7 @@ use cargo_metadata::{DependencyKind, Metadata, PackageId};
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::StableGraph;
 use petgraph::visit::Dfs;
+use rustsec::Advisory;
 use std::collections::{HashMap, HashSet};
 
 pub struct Graph {
@@ -13,7 +14,11 @@ pub struct Graph {
     pub roots: Vec<PackageId>,
 }
 
-pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
+pub fn build(
+    args: &Args,
+    metadata: Metadata,
+    vulns: &HashMap<String, Vec<&Advisory>>,
+) -> Result<Graph, Error> {
     let resolve = metadata.resolve.unwrap();
 
     let mut graph = Graph {
@@ -25,7 +30,9 @@ pub fn build(args: &Args, metadata: Metadata) -> Result<Graph, Error> {
     for package in metadata.packages {
         let id = package.id.clone();
         let workspace_member = metadata.workspace_members.contains(&package.id);
-        let index = graph.graph.add_node(Pkg::new(package, workspace_member));
+        let index = graph
+            .graph
+            .add_node(Pkg::new(package, workspace_member, vulns));
         graph.nodes.insert(id, index);
     }
 
