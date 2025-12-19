@@ -8,6 +8,8 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: read
     name: build
     runs-on: ${{ matrix.os }}
     strategy:
@@ -15,7 +17,9 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     - name: Build
       run: cargo build --verbose
     - name: Run tests
@@ -24,10 +28,14 @@ jobs:
       run: cargo run -- debstatus
 
   clippy:
+    permissions:
+      contents: read
     name: clippy
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -40,9 +48,13 @@ jobs:
         args: --all-targets -- --deny warnings
 
   fmt:
+    permissions:
+      contents: read
     name: fmt
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
+      with:
+        persist-credentials: false
     - name: Run cargo fmt
       run: cargo fmt -- --check
