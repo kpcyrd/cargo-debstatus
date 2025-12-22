@@ -343,7 +343,7 @@ impl<C: Client> Connection<C> {
 pub(crate) mod tests {
     use std::{collections::HashMap, path::Path};
 
-    use crate::db::{is_compatible, is_newer, Connection, PkgStatus, PkgType};
+    use crate::db::{Connection, PkgStatus, PkgType, is_compatible, is_newer};
     use anyhow::anyhow;
     use semver::{Version, VersionReq};
 
@@ -406,11 +406,13 @@ pub(crate) mod tests {
 
     #[test]
     fn is_compatible_with_tilde() {
-        assert!(is_compatible(
-            "1.0.0~alpha.9",
-            &VersionReq::parse("1.0.0-alpha.9").unwrap()
-        )
-        .unwrap());
+        assert!(
+            is_compatible(
+                "1.0.0~alpha.9",
+                &VersionReq::parse("1.0.0-alpha.9").unwrap()
+            )
+            .unwrap()
+        );
     }
 
     #[test]

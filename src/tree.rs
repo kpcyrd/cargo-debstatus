@@ -6,8 +6,8 @@ use crate::errors::*;
 use crate::format::{self, Pattern};
 use crate::graph::Graph;
 use cargo_metadata::{DependencyKind, PackageId};
-use petgraph::visit::EdgeRef;
 use petgraph::EdgeDirection;
+use petgraph::visit::EdgeRef;
 use semver::Version;
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
@@ -360,8 +360,8 @@ mod tests {
     use crate::{
         args::Args,
         db::{
-            tests::{mock_connection, MockClient},
             Connection,
+            tests::{MockClient, mock_connection},
         },
         debian, graph,
     };
