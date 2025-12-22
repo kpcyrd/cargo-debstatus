@@ -109,10 +109,10 @@ fn find_package<'a>(package: &str, graph: &'a Graph) -> Result<&'a PackageId, Er
             continue;
         }
 
-        if let Some(version) = &version {
-            if package.version != *version {
-                continue;
-            }
+        if let Some(version) = &version
+            && package.version != *version
+        {
+            continue;
         }
 
         candidates.push(package);
@@ -309,20 +309,20 @@ fn print_dependencies<'a, W: Write>(
             _ => unreachable!(),
         };
 
-        if let Prefix::Indent = prefix {
-            if let Some(name) = name {
-                // start with padding used by packaging status icons
-                write!(writer, "    ")?;
+        if let Prefix::Indent = prefix
+            && let Some(name) = name
+        {
+            // start with padding used by packaging status icons
+            write!(writer, "    ")?;
 
-                // print tree graph parts
-                for continues in &**levels_continue {
-                    let c = if *continues { symbols.down } else { " " };
-                    write!(writer, "{c}   ")?;
-                }
-
-                // print the actual texts
-                writeln!(writer, "{name}")?;
+            // print tree graph parts
+            for continues in &**levels_continue {
+                let c = if *continues { symbols.down } else { " " };
+                write!(writer, "{c}   ")?;
             }
+
+            // print the actual texts
+            writeln!(writer, "{name}")?;
         }
     }
 
