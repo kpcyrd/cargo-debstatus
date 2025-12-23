@@ -103,8 +103,7 @@ pub trait Client {
 impl Client for LiveClient {
     fn run_query(&mut self, query: &str, params: &[&str]) -> Result<Vec<Vec<String>>, Error> {
         let cast: Vec<_> = params.iter().map(|s| s as &(dyn ToSql + Sync)).collect();
-        let res = self
-            .query(query, &cast)
+        self.query(query, &cast)
             .map_err(|err| err.into())
             .map(|rows| {
                 rows.iter()
@@ -114,8 +113,7 @@ impl Client for LiveClient {
                             .collect()
                     })
                     .collect()
-            });
-        res
+            })
     }
 }
 
@@ -202,10 +200,8 @@ impl<C: Client> Connection<C> {
         version: &Version,
         skip_cache: bool,
     ) -> Result<PkgInfo, Error> {
-        if !skip_cache {
-            if let Some(info) = self.check_cache("sid", package, version)? {
-                return Ok(info);
-            }
+        if !skip_cache && let Some(info) = self.check_cache("sid", package, version)? {
+            return Ok(info);
         }
 
         // config.shell().status("Querying", format!("sid: {}", package))?;
@@ -236,10 +232,8 @@ impl<C: Client> Connection<C> {
         version: &Version,
         skip_cache: bool,
     ) -> Result<PkgInfo, Error> {
-        if !skip_cache {
-            if let Some(info) = self.check_cache("new", package, version)? {
-                return Ok(info);
-            }
+        if !skip_cache && let Some(info) = self.check_cache("new", package, version)? {
+            return Ok(info);
         }
 
         // config.shell().status("Querying", format!("new: {}", package))?;
@@ -316,22 +310,21 @@ impl<C: Client> Connection<C> {
             } else if info.status == PkgStatus::NotFound {
                 info.version = debversion.to_string();
                 info.status = PkgStatus::Outdated;
-            } else if info.status == PkgStatus::Outdated {
-                if let (Ok(existing), Ok(ours)) = (
+            } else if info.status == PkgStatus::Outdated
+                && let (Ok(existing), Ok(ours)) = (
                     parse_deb_version(&info.version),
                     parse_deb_version(debversion),
-                ) {
-                    if existing < ours {
-                        info.version = debversion.to_string();
-                    }
-                }
+                )
+                && existing < ours
+            {
+                info.version = debversion.to_string();
             }
         }
 
-        if info.status == PkgStatus::Outdated {
-            if let Ok(true) = is_newer(&info.version, &version) {
-                info.status = PkgStatus::TooRecent
-            }
+        if info.status == PkgStatus::Outdated
+            && let Ok(true) = is_newer(&info.version, &version)
+        {
+            info.status = PkgStatus::TooRecent
         }
 
         debug!("{package} {:?}", info);
@@ -343,7 +336,7 @@ impl<C: Client> Connection<C> {
 pub(crate) mod tests {
     use std::{collections::HashMap, path::Path};
 
-    use crate::db::{is_compatible, is_newer, Connection, PkgStatus, PkgType};
+    use crate::db::{Connection, PkgStatus, PkgType, is_compatible, is_newer};
     use anyhow::anyhow;
     use semver::{Version, VersionReq};
 
@@ -406,11 +399,13 @@ pub(crate) mod tests {
 
     #[test]
     fn is_compatible_with_tilde() {
-        assert!(is_compatible(
-            "1.0.0~alpha.9",
-            &VersionReq::parse("1.0.0-alpha.9").unwrap()
-        )
-        .unwrap());
+        assert!(
+            is_compatible(
+                "1.0.0~alpha.9",
+                &VersionReq::parse("1.0.0-alpha.9").unwrap()
+            )
+            .unwrap()
+        );
     }
 
     #[test]

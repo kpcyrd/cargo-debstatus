@@ -8,7 +8,7 @@ license = "(MIT OR Apache-2.0) AND GPL-3.0-or-later"
 repository = "https://github.com/kpcyrd/cargo-debstatus"
 categories = ["command-line-utilities"]
 readme = "README.md"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
