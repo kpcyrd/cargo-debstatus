@@ -17,6 +17,8 @@ pub enum DependencyFilter {
     /// Only show missing dependencies, which require going through the NEW queue.
     /// Missing dependencies of crates that are newer in Debian are ignored.
     Missing,
+    /// Remove all the workspace dependencies to keep only third-party ones
+    ThirdParty,
 }
 
 impl Display for DependencyFilter {
@@ -24,6 +26,7 @@ impl Display for DependencyFilter {
         f.write_str(match self {
             DependencyFilter::All => "all",
             DependencyFilter::Missing => "missing",
+            DependencyFilter::ThirdParty => "third-party",
         })
     }
 }
@@ -50,6 +53,14 @@ impl DependencyFilter {
                                 false
                             }
                         })
+                });
+            }
+            DependencyFilter::ThirdParty => {
+                graph.graph.retain_edges(|graph, edge| {
+                    (*graph).edge_endpoints(edge).is_some_and(|(_, target)| {
+                        let target_pkg: &Pkg = &graph[target];
+                        !target_pkg.workspace_member
+                    })
                 });
             }
         }

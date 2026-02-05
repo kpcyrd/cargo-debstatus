@@ -30,7 +30,9 @@ fn main() -> Result<(), Error> {
     let mut graph = graph::build(&args, metadata)?;
     info!("Populating with debian data");
     debian::populate(&mut graph, &args, &Connection::new)?;
-    args.filter.run(&mut graph);
+    for filter in &args.filter {
+        filter.run(&mut graph);
+    }
     info!("Printing graph");
     tree::print(&args, &graph, &mut io::stdout())?;
 
