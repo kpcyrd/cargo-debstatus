@@ -212,6 +212,18 @@ impl<C: Client> Connection<C> {
             version,
             PkgType::Binary,
         )?;
+
+        // If not found, also check for packages that provide the target package names
+        if info.status == PkgStatus::NotFound {
+            info!("Querying -> sid (binary provides): {}", package);
+            info = self.search_generic(
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                package,
+                version,
+                PkgType::Binary,
+            )?;
+        }
+
         if info.status == PkgStatus::NotFound {
             info!("Querying -> sid (source): {}", package);
             info = self.search_generic(
@@ -441,6 +453,11 @@ pub(crate) mod tests {
                 vec!["librust-usvg-dev", "librust-usvg-0.45-dev"],
                 vec![vec!["0.45.0-2"]],
             ),
+            (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                vec!["librust-usvg-dev", "librust-usvg-0.45-dev"],
+                vec![],
+            ),
         ][..];
         let tmpdir =
             tempfile::tempdir().expect("could not create a temporary directory for the cache");
@@ -463,6 +480,11 @@ pub(crate) mod tests {
             ),
             (
                 "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-vivid-dev", "librust-vivid-0.9-dev"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
                 vec!["librust-vivid-dev", "librust-vivid-0.9-dev"],
                 vec![],
             ),
@@ -599,5 +621,30 @@ pub(crate) mod tests {
             )
             .unwrap();
         assert_eq!(info.status, PkgStatus::Outdated);
+    }
+
+    #[test]
+    fn find_via_provides() {
+        // Test a package that is provided by another package
+        let mocked_responses = &[
+            (
+                "SELECT version::text FROM packages WHERE package in ($1, $2) AND release='sid';",
+                vec!["librust-example-dev", "librust-example-1-dev"],
+                vec![],
+            ),
+            (
+                "SELECT version::text FROM packages WHERE release='sid' AND (provides ~ $1 OR provides ~ $2);",
+                vec!["librust-example-dev", "librust-example-1-dev"],
+                vec![vec!["1.2.3-1"]],
+            ),
+        ][..];
+        let tmpdir =
+            tempfile::tempdir().expect("could not create a temporary directory for the cache");
+        let mut db = mock_connection(tmpdir.path(), mocked_responses);
+        let info = db
+            .search("example", &Version::parse("1.2.0").unwrap(), true)
+            .unwrap();
+        assert_eq!(info.status, PkgStatus::Found);
+        assert_eq!(info.version, "1.2.3");
     }
 }
