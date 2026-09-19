@@ -9,6 +9,7 @@ mod args;
 mod db;
 mod debian;
 mod errors;
+mod filter;
 mod format;
 mod graph;
 mod metadata;
@@ -29,6 +30,9 @@ fn main() -> Result<(), Error> {
     let mut graph = graph::build(&args, metadata)?;
     info!("Populating with debian data");
     debian::populate(&mut graph, &args, &Connection::new)?;
+    for filter in &args.filter {
+        filter.run(&mut graph);
+    }
     info!("Printing graph");
     tree::print(&args, &graph, &mut io::stdout())?;
 
